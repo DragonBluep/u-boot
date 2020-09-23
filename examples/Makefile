@@ -2,7 +2,7 @@
 # SPDX-License-Identifier:	GPL-2.0+
 #
 
-ifndef CONFIG_SANDBOX
+ifdef CONFIG_EXAMPLES
 
 ifdef FTRACE
 subdir-ccflags-y += -finstrument-functions -DFTRACE
