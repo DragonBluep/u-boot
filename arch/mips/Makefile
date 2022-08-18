@@ -6,6 +6,10 @@ ifeq ($(CONFIG_SPL_BUILD),y)
 ifneq ($(CONFIG_SPL_START_S_PATH),)
 head-y := $(CONFIG_SPL_START_S_PATH:"%"=%)/start.o
 endif
+else
+ifneq ($(CONFIG_START_S_PATH),)
+head-y := $(CONFIG_START_S_PATH:"%"=%)/start.o
+endif
 endif
 
 libs-y += arch/mips/cpu/
@@ -14,6 +18,7 @@ libs-y += arch/mips/lib/
 machine-$(CONFIG_ARCH_ATH79) += ath79
 machine-$(CONFIG_ARCH_BMIPS) += bmips
 machine-$(CONFIG_MACH_PIC32) += pic32
+machine-$(CONFIG_MACH_MT7621) += mt7621
 
 machdirs := $(patsubst %,arch/mips/mach-%/,$(machine-y))
 libs-y += $(machdirs)

@@ -729,6 +729,7 @@ libs-y += test/
 libs-y += test/dm/
 libs-$(CONFIG_UT_ENV) += test/env/
 libs-$(CONFIG_UT_OVERLAY) += test/overlay/
+libs-$(CONFIG_WEBUI_FAILSAFE) += failsafe/
 
 libs-y += $(if $(BOARDDIR),board/$(BOARDDIR)/)
 
@@ -861,6 +862,9 @@ ifneq ($(CONFIG_SYS_INIT_SP_BSS_OFFSET),)
 ALL-y += init_sp_bss_offset_check
 endif
 
+# Build unified image for MediaTek MT7621 platform
+ALL-$(CONFIG_MACH_MT7621) += u-boot-mt7621.bin
+
 LDFLAGS_u-boot += $(LDFLAGS_FINAL)
 
 # Avoid 'Not enough room for program headers' error on binutils 2.28 onwards.
@@ -899,6 +903,9 @@ append = cat $(filter-out $< $(PHONY), $^) >> $@
 
 quiet_cmd_pad_cat = CAT     $@
 cmd_pad_cat = $(cmd_objcopy) && $(append) || rm -f $@
+
+quiet_cmd_lzma = LZMA    $@
+cmd_lzma = lzma -c -z -k -9 $< > $@
 
 cfg: u-boot.cfg
 
@@ -1097,6 +1104,16 @@ MKIMAGEFLAGS_u-boot-spl.kwb = -n $(srctree)/$(CONFIG_SYS_KWD_CONFIG:"%"=%) \
 
 MKIMAGEFLAGS_u-boot.pbl = -n $(srctree)/$(CONFIG_SYS_FSL_PBL_RCW:"%"=%) \
 		-R $(srctree)/$(CONFIG_SYS_FSL_PBL_PBI:"%"=%) -T pblimage
+
+MKIMAGEFLAGS_u-boot-lzma.img = -A $(ARCH) -T firmware -C lzma -O u-boot \
+	-a $(CONFIG_SYS_TEXT_BASE) -e $(CONFIG_SYS_UBOOT_START) \
+	-n "U-Boot $(UBOOTRELEASE) for $(BOARD) board"
+
+u-boot.bin.lzma: u-boot.bin FORCE
+	$(call if_changed,lzma)
+
+u-boot-lzma.img: u-boot.bin.lzma FORCE
+	$(call if_changed,mkimage)
 
 u-boot-dtb.img u-boot.img u-boot.kwb u-boot.pbl u-boot-ivt.img: \
 		$(if $(CONFIG_SPL_LOAD_FIT),u-boot-nodtb.bin dts/dt.dtb,u-boot.bin) FORCE
@@ -1315,6 +1332,31 @@ OBJCOPYFLAGS_u-boot-img-spl-at-end.bin := -I binary -O binary \
 	--pad-to=$(CONFIG_UBOOT_PAD_TO) --gap-fill=0xff
 u-boot-img-spl-at-end.bin: u-boot.img spl/u-boot-spl.bin FORCE
 	$(call if_changed,pad_cat)
+
+# MediaTek MT7621
+ifndef CONFIG_NAND_BOOT
+ifdef CONFIG_TPL
+MT7621_SPL_BINLOAD := u-boot-mt7621-spl.bin
+else
+MT7621_SPL_BINLOAD := spl/u-boot-spl.bin
+endif
+else
+MT7621_SPL_BINLOAD := spl/u-boot-mt7621-nand-spl.img
+endif
+
+u-boot-mt7621.bin: $(if $(CONFIG_SPL),$(MT7621_SPL_BINLOAD) $(SPL_PAYLOAD)) \
+		   u-boot.bin u-boot.dtb FORCE
+	$(call if_changed,binman)
+
+quiet_cmd_mtk_spl_patch = PATCH   $@
+cmd_mtk_spl_patch = cp $< $@ && \
+	$(objtree)/tools/mtk-spl-patch $@
+
+u-boot-spl-with-tpl.bin: tpl/u-boot-tpl.bin spl/u-boot-spl.img FORCE
+	$(call if_changed,cat)
+
+u-boot-mt7621-spl.bin: u-boot-spl-with-tpl.bin FORCE
+	$(call if_changed,mtk_spl_patch)
 
 # Create a new ELF from a raw binary file.
 ifndef PLATFORM_ELFENTRY

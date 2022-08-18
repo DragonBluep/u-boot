@@ -110,6 +110,22 @@ config TARGET_XILFPGA
 	help
 	  This supports IMGTEC MIPSfpga platform
 
+config MACH_MT7621
+	bool "Support MediaTek MT7621"
+	select DM
+	select MIPS_CM
+	select MIPS_L2_CACHE
+	select SUPPORTS_LITTLE_ENDIAN
+	select SUPPORTS_CPU_MIPS32_R2
+	select MIPS_L1_CACHE_SHIFT_5
+	select MIPS_BOOT_CMDLINE_LEGACY
+	select MIPS_BOOT_ENV_LEGACY
+	select SYS_MIPS_CACHE_INIT_RAM_LOAD
+	select ARCH_EARLY_INIT_R
+	select SUPPORT_SPL
+	select SUPPORT_TPL
+	select BINMAN
+
 endchoice
 
 source "board/imgtec/boston/Kconfig"
@@ -120,6 +136,7 @@ source "board/qemu-mips/Kconfig"
 source "arch/mips/mach-ath79/Kconfig"
 source "arch/mips/mach-bmips/Kconfig"
 source "arch/mips/mach-pic32/Kconfig"
+source "arch/mips/mach-mt7621/Kconfig"
 
 if MIPS
 
@@ -319,6 +336,14 @@ config MIPS_INIT_STACK_IN_SRAM
 	  stack frame and the early C environment is set up before
 	  lowlevel_init. Thus lowlevel_init does not need to be implemented
 	  in assembler.
+
+config MIPS_STACK_SRAM_INIT
+	bool
+	depends on MIPS_INIT_STACK_IN_SRAM
+	default n
+	help
+	  Select this if the SRAM used for initial stack frame needs to be
+	  configured before use.
 
 config SYS_DCACHE_SIZE
 	int

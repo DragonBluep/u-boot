@@ -18,6 +18,7 @@
 /kwboot
 /lib/
 /mips-relocs
+/mtk-spl-patch
 /mkenvimage
 /mkexynosspl
 /mkimage

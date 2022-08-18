@@ -117,6 +117,16 @@ config MVEBU_A3700_SPI
 	  used to access the SPI NOR flash on platforms embedding this
 	  Marvell IP core.
 
+config MT7621_SPI
+	bool "MediaTek MT7621 SPI controller driver"
+	depends on MACH_MT7621
+	help
+	  Enable the MediaTek MT7621 SoC SPI controller driver.
+	  Note that this driver has a max io length of 36 bytes which can
+	  only be used for spi flash drivers.
+	  This driver uses driver model and requires a device tree binding to
+	  operate.
+
 config PIC32_SPI
 	bool "Microchip PIC32 SPI driver"
 	depends on MACH_PIC32

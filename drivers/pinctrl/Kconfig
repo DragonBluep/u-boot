@@ -298,6 +298,15 @@ config ASPEED_AST2500_PINCTRL
 	Generic Pinctrl framework and is compatible with the Linux driver,
 	i.e. it uses the same device tree configuration.
 
+config PINCTRL_MT7621
+	bool "MediaTek MT7621 pin control driver"
+	depends on DM && MACH_MT7621
+	help
+	  Support pin multiplexing control on MediaTek MT7621.
+	  The driver is controlled by a device tree node which contains
+	  both the pin mux functions and pin config functions for each
+	  available pin groups.
+
 endif
 
 source "drivers/pinctrl/meson/Kconfig"

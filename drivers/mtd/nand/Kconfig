@@ -150,6 +150,15 @@ config NAND_ARASAN
 	  controller. This uses the hardware ECC for read and
 	  write operations.
 
+config NAND_MT7621
+	bool "Support for MT7621 NAND Controller"
+	depends on MACH_MT7621
+	select SYS_NAND_SELF_INIT
+	imply CMD_NAND
+	help
+	  Enable support for MT7621 NAND Controller.
+	  For SPL build please choose SPL_NAND_MT7621.
+
 config NAND_MXC
 	bool "MXC NAND support"
 	depends on CPU_ARM926EJS || CPU_ARM1136 || MX5
@@ -285,6 +294,14 @@ config SPL_NAND_DENALI
 	help
 	  This is a small implementation of the Denali NAND controller
 	  for use on SPL.
+
+config SPL_NAND_MT7621
+	bool "Support for MT7621 NAND Controller for SPL"
+	depends on MACH_MT7621
+	select SYS_NAND_SELF_INIT
+	help
+	  Enable support for MT7621 NAND Controller for SPL build.
+	  Only basic functions are included.
 
 config SPL_NAND_SIMPLE
 	bool "Use simple SPL NAND driver"

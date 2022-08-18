@@ -31,4 +31,8 @@ void crc32_wd_buf(const unsigned char *input, uint ilen,
 void crc32c_init(uint32_t *, uint32_t);
 uint32_t crc32c_cal(uint32_t, const char *, int, uint32_t *);
 
+/* lib/crc32c_be.c */
+void crc32c_be_init(uint32_t *, uint32_t);
+uint32_t crc32c_be_cal(uint32_t, const char *, int, uint32_t *);
+
 #endif /* _UBOOT_CRC_H */

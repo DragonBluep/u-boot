@@ -55,6 +55,7 @@ obj-$(CONFIG_SHA256) += sha256.o
 obj-$(CONFIG_$(SPL_)ZLIB) += zlib/
 obj-$(CONFIG_$(SPL_)GZIP) += gunzip.o
 obj-$(CONFIG_$(SPL_)LZO) += lzo/
+obj-$(CONFIG_$(SPL_)LZMA) += lzma/
 
 obj-$(CONFIG_LIBAVB) += libavb/
 
@@ -77,6 +78,7 @@ CFLAGS_display_options.o := $(if $(BUILD_TAG),-DBUILD_TAG='"$(BUILD_TAG)"')
 obj-$(CONFIG_BCH) += bch.o
 obj-y += crc32.o
 obj-$(CONFIG_CRC32C) += crc32c.o
+obj-$(CONFIG_CRC32C_BE) += crc32c_be.o
 obj-y += ctype.o
 obj-y += div64.o
 obj-y += hang.o

@@ -98,4 +98,10 @@ config RESET_SOCFPGA
 	help
 	  Support for reset controller on SoCFPGA platform.
 
+config MT7621_RESET
+	bool "Reset controller driver for MediaTek MT7621"
+	depends on DM_RESET
+	help
+	  Support for reset controller on MediaTek MT7621 platform.
+
 endmenu

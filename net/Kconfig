@@ -22,4 +22,13 @@ config NETCONSOLE
 	  Support the 'nc' input/output device for networked console.
 	  See README.NetConsole for details.
 
+config TCP
+	bool
+	default n
+
+config HTTPD
+	bool
+	default n
+	depends on TCP
+
 endif   # if NET

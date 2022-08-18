@@ -286,7 +286,9 @@ void xhci_queue_command(struct xhci_ctrl *ctrl, u8 *ptr, u32 slot_id,
 	 * Only 'reset endpoint', 'stop endpoint' and 'set TR dequeue pointer'
 	 * commands need endpoint id encoded.
 	 */
+#ifndef CONFIG_USB_XHCI_MT7621
 	if (cmd >= TRB_RESET_EP && cmd <= TRB_SET_DEQ)
+#endif
 		fields[3] |= EP_ID_FOR_TRB(ep_index);
 
 	queue_trb(ctrl, ctrl->cmd_ring, false, fields);
@@ -295,6 +297,7 @@ void xhci_queue_command(struct xhci_ctrl *ctrl, u8 *ptr, u32 slot_id,
 	xhci_writel(&ctrl->dba->doorbell[0], DB_VALUE_HOST);
 }
 
+#ifndef CONFIG_USB_XHCI_MT7621
 /**
  * The TD size is the number of bytes remaining in the TD (including this TRB),
  * right shifted by 10.
@@ -312,6 +315,7 @@ static u32 xhci_td_remainder(unsigned int remainder)
 	else
 		return (remainder >> 10) << 17;
 }
+#endif
 
 /**
  * Finds out the remanining packets to be sent
@@ -334,6 +338,10 @@ static u32 xhci_v1_0_td_remainder(int running_total,
 	/* One TRB with a zero-length data packet. */
 	if (num_trbs_left == 0 || (running_total == 0 && trb_buff_len == 0))
 		return 0;
+
+#ifdef CONFIG_USB_XHCI_MT7621
+	trb_buff_len = 0;
+#endif
 
 	/*
 	 * All the TRB queueing functions don't count the current TRB in
@@ -679,9 +687,11 @@ int xhci_bulk_tx(struct usb_device *udev, unsigned long pipe,
 			field |= TRB_ISP;
 
 		/* Set the TRB length, TD size, and interrupter fields. */
+#ifndef CONFIG_USB_XHCI_MT7621
 		if (HC_VERSION(xhci_readl(&ctrl->hccr->cr_capbase)) < 0x100)
 			remainder = xhci_td_remainder(length - running_total);
 		else
+#endif
 			remainder = xhci_v1_0_td_remainder(running_total,
 							   trb_buff_len,
 							   total_packet_count,
@@ -827,7 +837,11 @@ int xhci_ctrl_tx(struct usb_device *udev, unsigned long pipe,
 		field |= 0x1;
 
 	/* xHCI 1.0 6.4.1.2.1: Transfer Type field */
+#ifndef CONFIG_USB_XHCI_MT7621
 	if (HC_VERSION(xhci_readl(&ctrl->hccr->cr_capbase)) == 0x100) {
+#else
+	if (1) {
+#endif
 		if (length > 0) {
 			if (req->requesttype & USB_DIR_IN)
 				field |= (TRB_DATA_IN << TRB_TX_TYPE_SHIFT);
@@ -863,12 +877,17 @@ int xhci_ctrl_tx(struct usb_device *udev, unsigned long pipe,
 	else
 		field = (TRB_DATA << TRB_TYPE_SHIFT);
 
-	length_field = (length & TRB_LEN_MASK) | xhci_td_remainder(length) |
+	length_field = (length & TRB_LEN_MASK) |
+#ifndef CONFIG_USB_XHCI_MT7621
+			xhci_td_remainder(length) |
+#endif
 			((0 & TRB_INTR_TARGET_MASK) << TRB_INTR_TARGET_SHIFT);
+#ifndef CONFIG_USB_XHCI_MT7621
 	debug("length_field = %d, length = %d,"
 		"xhci_td_remainder(length) = %d , TRB_INTR_TARGET(0) = %d\n",
 		length_field, (length & TRB_LEN_MASK),
 		xhci_td_remainder(length), 0);
+#endif
 
 	if (length > 0) {
 		if (req->requesttype & USB_DIR_IN)

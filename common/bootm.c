@@ -741,7 +741,11 @@ err:
 	if (ret == BOOTM_ERR_UNIMPLEMENTED)
 		bootstage_error(BOOTSTAGE_ID_DECOMP_UNIMPL);
 	else if (ret == BOOTM_ERR_RESET)
+#ifndef CONFIG_WEBUI_FAILSAFE_ON_AUTOBOOT_FAIL
 		do_reset(cmdtp, flag, argc, argv);
+#else
+		run_command("httpd", 0);
+#endif
 
 	return ret;
 }

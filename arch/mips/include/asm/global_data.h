@@ -27,6 +27,9 @@ struct arch_global_data {
 #ifdef CONFIG_MIPS_L2_CACHE
 	unsigned short l2_line_size;
 #endif
+#ifdef CONFIG_MACH_MT7621
+	unsigned long xtal_clk;
+#endif
 };
 
 #include <asm-generic/global_data.h>

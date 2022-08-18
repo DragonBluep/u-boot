@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 
-MEMORY { .spl_mem : ORIGIN = CONFIG_SPL_TEXT_BASE, \
-		LENGTH = CONFIG_SPL_MAX_SIZE }
-MEMORY { .bss_mem : ORIGIN = CONFIG_SPL_BSS_START_ADDR, \
-		LENGTH = CONFIG_SPL_BSS_MAX_SIZE }
+MEMORY { .spl_mem : ORIGIN = CONFIG_VAL(TEXT_BASE), \
+		LENGTH = CONFIG_VAL(MAX_SIZE) }
+MEMORY { .bss_mem : ORIGIN = CONFIG_VAL(BSS_START_ADDR), \
+		LENGTH = CONFIG_VAL(BSS_MAX_SIZE) }
 
 OUTPUT_ARCH(mips)
 ENTRY(_start)
@@ -13,7 +13,9 @@ SECTIONS
 
 	. = ALIGN(4);
 	.text : {
+		__text_start = .;
 		*(.text*)
+		__text_end = .;
 	} > .spl_mem
 
 	. = ALIGN(4);
@@ -27,15 +29,22 @@ SECTIONS
 		*(SORT_BY_ALIGNMENT(.sdata*))
 	} > .spl_mem
 
-#ifdef CONFIG_SPL_DM
 	. = ALIGN(4);
 	.u_boot_list : {
 		KEEP(*(SORT(.u_boot_list*)));
 	} > .spl_mem
-#endif
+
+	. = ALIGN(4);
+	.binman_sym_table : {
+		__binman_sym_start = .;
+		KEEP(*(SORT(.binman_sym*)));
+		__binman_sym_end = .;
+	} > .spl_mem
 
 	. = ALIGN(4);
 	__image_copy_end = .;
+
+	__ld_rom_size = __image_copy_end - __text_start;
 
 	.bss (NOLOAD) : {
 		__bss_start = .;
@@ -46,8 +55,9 @@ SECTIONS
 		__bss_end = .;
 	} > .bss_mem
 
-	.rel.dyn (NOLOAD) : {
+	/DISCARD/ : {
 		*(.rel.dyn)
+		*(.MIPS.abiflags)
 	}
 
 	.dynsym : {

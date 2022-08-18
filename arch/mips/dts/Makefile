@@ -16,6 +16,8 @@ dtb-$(CONFIG_BOARD_NETGEAR_CG3100D) += netgear,cg3100d.dtb
 dtb-$(CONFIG_BOARD_NETGEAR_DGND3700V2) += netgear,dgnd3700v2.dtb
 dtb-$(CONFIG_BOARD_SAGEM_FAST1704) += sagem,f@st1704.dtb
 dtb-$(CONFIG_BOARD_TPLINK_WDR4300) += tplink_wdr4300.dtb
+dtb-$(CONFIG_BOARD_MT7621_RFB) += mt7621_nor_rfb.dtb
+dtb-$(CONFIG_BOARD_MT7621_NAND_RFB) += mt7621_nand_rfb.dtb
 
 targets += $(dtb-y)
 

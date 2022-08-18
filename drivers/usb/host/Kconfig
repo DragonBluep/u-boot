@@ -94,6 +94,13 @@ config USB_XHCI_FSL
 	depends on !SPL_NO_USB
 	help
 	  Enables support for the on-chip xHCI controller on NXP Layerscape SoCs.
+
+config USB_XHCI_MT7621
+	bool "Support for MediaTek MT7621 on-chip xHCI USB controller"
+	depends on MACH_MT7621
+	default y
+	help
+	  Enables support for the on-chip xHCI controller on MediaTek MT7621 SoC.
 endif # USB_XHCI_HCD
 
 config USB_EHCI_HCD

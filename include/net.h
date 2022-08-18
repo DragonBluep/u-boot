@@ -351,6 +351,7 @@ struct vlan_ethernet_hdr {
 #define PROT_PPP_SES	0x8864		/* PPPoE session messages	*/
 
 #define IPPROTO_ICMP	 1	/* Internet Control Message Protocol	*/
+#define IPPROTO_TCP	6	/* Transmission Control Protocol	*/
 #define IPPROTO_UDP	17	/* User Datagram Protocol		*/
 
 /*
@@ -536,7 +537,7 @@ extern int		net_restart_wrap;	/* Tried all network devices */
 
 enum proto_t {
 	BOOTP, RARP, ARP, TFTPGET, DHCP, PING, DNS, NFS, CDP, NETCONS, SNTP,
-	TFTPSRV, TFTPPUT, LINKLOCAL, FASTBOOT, WOL
+	TFTPSRV, TFTPPUT, LINKLOCAL, FASTBOOT, WOL, TCP
 };
 
 extern char	net_boot_file_name[1024];/* Boot File name */

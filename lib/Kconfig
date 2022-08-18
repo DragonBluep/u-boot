@@ -242,6 +242,9 @@ config MD5
 config CRC32C
 	bool
 
+config CRC32C_BE
+	bool
+
 endmenu
 
 menu "Compression Support"
@@ -288,6 +291,11 @@ config SPL_ZLIB
 	bool
 	help
 	  This enables compression lib for SPL boot.
+
+config SPL_LZMA
+	bool "Enable LZMA decompression support for SPL build"
+	help
+	  This enables support for LZMA compression altorithm for SPL boot.
 
 endmenu
 

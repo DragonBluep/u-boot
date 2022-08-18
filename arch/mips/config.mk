@@ -64,4 +64,5 @@ PLATFORM_CPPFLAGS		+= -msoft-float
 PLATFORM_LDFLAGS		+= -G 0 -static -n -nostdlib
 PLATFORM_RELFLAGS		+= -ffunction-sections -fdata-sections
 LDFLAGS_FINAL			+= --gc-sections
-OBJCOPYFLAGS			+= -j .text -j .rodata -j .data -j .u_boot_list
+OBJCOPYFLAGS			+= -j .text -j .rodata -j .data -j .u_boot_list \
+				   -j .binman_sym_table

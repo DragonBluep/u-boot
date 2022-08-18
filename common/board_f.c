@@ -524,7 +524,7 @@ static int setup_board_part1(void)
 	 * Save local variables to board info struct
 	 */
 	bd->bi_memstart = CONFIG_SYS_SDRAM_BASE;	/* start of memory */
-	bd->bi_memsize = gd->ram_size;			/* size in bytes */
+	bd->bi_memsize = get_effective_memsize();	/* size in bytes */
 
 #ifdef CONFIG_SYS_SRAM_BASE
 	bd->bi_sramstart = CONFIG_SYS_SRAM_BASE;	/* start of SRAM */

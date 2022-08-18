@@ -385,6 +385,34 @@ __BUILDIO(q, u64)
 #define writeq_be(val, addr)						\
 	__raw_writeq(cpu_to_be64((val)), (__force unsigned *)(addr))
 
+#define out_le8(addr, val)						\
+	__raw_writeb((val), (__force unsigned *)(addr))
+#define out_le16(addr, val)						\
+	__raw_writew(cpu_to_le16((val)), (__force unsigned *)(addr))
+#define out_le32(addr, val)						\
+	__raw_writel(cpu_to_le32((val)), (__force unsigned *)(addr))
+#define out_le64(addr, val)						\
+	__raw_writeq(cpu_to_le64((val)), (__force unsigned *)(addr))
+
+#define out_be8(addr, val) writeb_be(val, addr)
+#define out_be16(addr, val) writew_be(val, addr)
+#define out_be32(addr, val) writel_be(val, addr)
+#define out_be64(addr, val) writeq_be(val, addr)
+
+#define in_le8(addr)						\
+	__raw_readb((__force unsigned *)(addr))
+#define in_le16(addr)						\
+	le16_to_cpu(__raw_readw((__force unsigned *)(addr)))
+#define in_le32(addr)						\
+	le32_to_cpu(__raw_readl((__force unsigned *)(addr)))
+#define in_le64(addr)						\
+	le64_to_cpu(__raw_readq((__force unsigned *)(addr)))
+
+#define in_be8(addr) readb_be(addr)
+#define in_be16(addr) readw_be(addr)
+#define in_be32(addr) readl_be(addr)
+#define in_be64(addr) readq_be(addr)
+
 /*
  * Some code tests for these symbols
  */

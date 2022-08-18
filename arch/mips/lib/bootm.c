@@ -310,6 +310,12 @@ static void boot_jump_linux(bootm_headers_t *images)
 	bootstage_report();
 #endif
 
+	/* Restore EBASE for compatibility */
+	set_c0_status(ST0_BEV);
+	write_c0_ebase(KSEG0);
+	clear_c0_status(ST0_BEV);
+	execution_hazard_barrier();
+
 	if (images->ft_len)
 		kernel(-2, (ulong)images->ft_addr, 0, 0);
 	else
