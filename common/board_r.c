@@ -738,6 +738,9 @@ static init_fnc_t init_sequence_r[] = {
 #if defined(CFG_PRAM)
 	initr_mem,
 #endif
+#ifdef CONFIG_BUTTON_BOOTSTRAP
+	mtk_button_bootstrap,
+#endif
 	run_main_loop,
 };
 
