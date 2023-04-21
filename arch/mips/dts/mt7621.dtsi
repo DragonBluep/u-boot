@@ -5,6 +5,8 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
+/dts-v1/;
+
 #include <dt-bindings/clock/mt7621-clk.h>
 #include <dt-bindings/reset/mt7621-reset.h>
 #include <dt-bindings/phy/phy.h>
@@ -85,37 +87,159 @@
 		pinctrl-0 = <&state_default>;
 
 		state_default: pin_state {
+			gpio0-gpio_pins {
+				groups = "gpio0";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			i2c-gpio_pins {
+				groups = "i2c";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			uart2-gpio_pins {
+				groups = "uart2";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			uart3-gpio_pins {
+				groups = "uart3";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			jtag-gpio_pins {
+				groups = "jtag";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			wdt-gpio_pins {
+				groups = "wdt";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			perst-gpio_pins {
+				groups = "pcie reset";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			rgmii2-gpio_pins {
+				groups = "rgmii2";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <2>;
+				slew-rate = <1>;
+			};
+
+			sdxc-gpio_pins {
+				groups = "sdxc";
+				function = "gpio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			spi-nand_pins {
+				groups = "spi";
+				function = "nand";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			sdxc-nand_pins {
+				groups = "sdxc";
+				function = "nand";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
 		};
 
 		uart1_pins: uart1_pins {
 			groups = "uart1";
 			function = "uart";
+			bias-disable;
+			input-schmitt-enable;
+			drive-strength = <4>;
+			slew-rate = <1>;
 		};
 
 		uart2_pins: uart2_pins {
 			groups = "uart2";
 			function = "uart";
+			bias-disable;
+			input-schmitt-enable;
+			drive-strength = <4>;
+			slew-rate = <1>;
 		};
 
 		uart3_pins: uart3_pins {
 			groups = "uart3";
 			function = "uart";
+			bias-disable;
+			input-schmitt-enable;
+			drive-strength = <4>;
+			slew-rate = <1>;
 		};
 
 		sdxc_pins: sdxc_pins {
 			groups = "sdxc";
 			function = "sdxc";
+			bias-disable;
+			input-schmitt-enable;
+			drive-strength = <6>;
+			slew-rate = <1>;
 		};
 
 		spi_pins: spi_pins {
 			groups = "spi";
 			function = "spi";
+			bias-disable;
+			input-schmitt-enable;
+			drive-strength = <4>;
+			slew-rate = <1>;
 		};
 
 		eth_pins: eth_pins {
 			mdio_pins {
 				groups = "mdio";
 				function = "mdio";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
 			};
 
 			rgmii1_pins {
@@ -123,14 +247,22 @@
 				function = "rgmii";
 			};
 
+			rgmii2_pins {
+				groups = "rgmii2";
+				function = "rgmii";
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
 			esw_pins {
 				groups = "esw int";
 				function = "esw int";
-			};
-
-			mdio_pconf {
-				groups = "mdio";
-				drive-strength = <2>;
+				bias-disable;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <1>;
 			};
 		};
 	};
@@ -141,8 +273,6 @@
 
 		resets = <&rstctrl RST_TIMER>;
 		reset-names = "wdt";
-
-		status = "disabled";
 	};
 
 	gpio: gpio@1e000600 {
@@ -193,6 +323,8 @@
 
 		#address-cells = <1>;
 		#size-cells = <0>;
+
+		num-cs = <2>;
 	};
 
 	uart0: uart1@1e000c00 {
