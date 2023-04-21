@@ -1,0 +1,33 @@
+baudrate=115200
+ipaddr=192.168.1.1
+serverip=192.168.1.2
+ethaddr=aa:bb:cc:dd:ee:ff
+loadaddr=0x88000000
+mtdids=nand0=nand.0
+mtdparts=mtdparts=nand.0:512k(u-boot),512k(u-boot-env),512k(exp),512k(factory),-(ubi)
+bootcmd=run ubi_read_firmware && bootm $loadaddr
+bootfile=initramfs.bin
+bootfile_firmware=firmware.bin
+bootfile_uboot=u-boot.bin
+bootmenu_confirm_return=askenv - Press ENTER to return to menu ; bootmenu 60
+bootmenu_0=Run default boot command=run boot_default
+bootmenu_1=Boot system via TFTP=run boot_tftp ; run bootmenu_confirm_return
+bootmenu_2=Boot system from flash=run bootcmd ; run bootmenu_confirm_return
+bootmenu_3=Load system via TFTP then write to flash=run boot_tftp_write_system ; run bootmenu_confirm_return
+bootmenu_4=[33mLoad U-Boot via TFTP then write to flash[0m=run boot_tftp_write_uboot ; run bootmenu_confirm_return
+bootmenu_5=[33mLoad U-Boot via TTL then write to flash[0m=run boot_serial_write_uboot ; run bootmenu_confirm_return
+bootmenu_6=Reboot=reset
+boot_default=if test -n $recmode ; then run boot_check_recovery ; else run bootcmd ; run boot_tftp_write_system_forever ; fi
+boot_check_recovery=if test $recmode = 1 ; then run boot_tftp_write_system_forever ; elif test $recmode = 2 ; then run boot_tftp_forever; fi
+boot_serial_write_uboot=loadx $loadaddr $baudrate && run nand_write_uboot
+boot_tftp=tftpboot $loadaddr $bootfile && bootm $loadaddr
+boot_tftp_forever=while true ; do run boot_tftp ; sleep 1 ; done
+boot_tftp_write_system=tftpboot $loadaddr $bootfile_firmware && iminfo $loadaddr && run ubi_write_firmware && bootm $loadaddr
+boot_tftp_write_system_forever=while true ; do run boot_tftp_write_system ; sleep 1 ; done
+boot_tftp_write_uboot=tftpboot $loadaddr $bootfile_uboot && run nand_write_uboot
+nand_verify_uboot=mtd read u-boot $loadaddr 0x0 0x$filesize && md5sum $loadaddr 0x$filesize
+nand_write_confirm=askenv confirm [36mPress Y then ENTER to confirm write to flash![0m 0x1 && flag=$confirm && setenv confirm && test -n $flag && test $flag = Y
+nand_write_uboot=md5sum $loadaddr 0x$filesize && run nand_write_confirm && mtd erase u-boot && mtd write u-boot $loadaddr 0x0 0x$filesize && run nand_verify_uboot
+ubi_read_firmware=ubi part ubi && ubi read $loadaddr fit
+ubi_write_cal_ersize=setexpr ersize 0x$filesize + 0x1efff && setexpr ersize 0x$ersize / 0x1f000 && setexpr ersize 0x$ersize * 0x1f000
+ubi_write_firmware=ubi detach ; mtd erase ubi && ubi part ubi && run ubi_write_cal_ersize && ubi create fit 0x$ersize dynamic && ubi write $loadaddr fit $filesize && ubi create rootfs_data - dynamic
