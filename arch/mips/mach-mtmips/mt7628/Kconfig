@@ -27,6 +27,18 @@ config BOARD_MT7628_RFB
 	  SPI-NOR flash, 1 built-in switch with 5 ports, 1 UART, 1 USB host,
 	  1 SDXC, 1 PCIe socket and JTAG pins.
 
+config BOARD_360_P2
+	bool "360 P2 Wireless Router"
+
+config BOARD_CMCC_ZY368
+	bool "CMCC ZY-368 Wireless Router"
+
+config BOARD_HiWiFi_HC5661A
+	bool "HiWiFi HC5661A Wireless Router"
+
+config BOARD_MOTOROLA_MWR03
+	bool "Motorola MWR03 Wireless Router"
+
 config BOARD_VOCORE2
 	bool "VoCore2"
 	select SPL_SERIAL
@@ -46,13 +58,16 @@ config SPL_UART2_SPIS_PINMUX
 
 config SYS_BOARD
 	string "Board name"
-	default "mt7628" if BOARD_MT7628_RFB
+	default "mt7628" if BOARD_MT7628_RFB || BOARD_360_P2 || \
+		BOARD_CMCC_ZY368 || BOARD_HiWiFi_HC5661A || BOARD_MOTOROLA_MWR03
 
 config SYS_CONFIG_NAME
-	default "mt7628" if BOARD_MT7628_RFB
+	default "mt7628" if BOARD_MT7628_RFB || BOARD_360_P2 || \
+		BOARD_CMCC_ZY368 || BOARD_HiWiFi_HC5661A || BOARD_MOTOROLA_MWR03
 
 config SYS_VENDOR
-	default "mediatek" if BOARD_MT7628_RFB
+	default "mediatek" if BOARD_MT7628_RFB || BOARD_360_P2 || \
+		BOARD_CMCC_ZY368 || BOARD_HiWiFi_HC5661A || BOARD_MOTOROLA_MWR03
 
 source "board/gardena/smart-gateway-mt7688/Kconfig"
 source "board/seeed/linkit-smart-7688/Kconfig"
