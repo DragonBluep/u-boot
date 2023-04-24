@@ -67,10 +67,13 @@ config CPU_FREQ_MULTI
 	default 7 if CPU_FREQ_620MHZ
 
 config SYS_CONFIG_NAME
-	default "mt7620" if  BOARD_MT7620_RFB || BOARD_MT7620_MT7530_RFB
+	default "mt7620"
 
 config SYS_BOARD
 	string "Board name"
-	default "mt7620" if  BOARD_MT7620_RFB || BOARD_MT7620_MT7530_RFB
+	default "mt7620"
+
+config SYS_VENDOR
+	default "mediatek"
 
 endif
