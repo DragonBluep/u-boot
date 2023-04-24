@@ -73,4 +73,7 @@ config SYS_BOARD
 	string "Board name"
 	default "mt7620" if  BOARD_MT7620_RFB || BOARD_MT7620_MT7530_RFB
 
+config SYS_VENDOR
+	default "mediatek" if BOARD_MT7620_RFB || BOARD_MT7620_MT7530_RFB
+
 endif

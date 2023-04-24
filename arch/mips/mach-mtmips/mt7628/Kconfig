@@ -51,6 +51,9 @@ config SYS_BOARD
 config SYS_CONFIG_NAME
 	default "mt7628" if BOARD_MT7628_RFB
 
+config SYS_VENDOR
+	default "mediatek" if BOARD_MT7628_RFB
+
 source "board/gardena/smart-gateway-mt7688/Kconfig"
 source "board/seeed/linkit-smart-7688/Kconfig"
 source "board/vocore/vocore2/Kconfig"
