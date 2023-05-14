@@ -1899,7 +1899,7 @@ $(filter-out tools, $(u-boot-dirs)): tools
 examples: $(filter-out examples, $(u-boot-dirs))
 
 define filechk_uboot.release
-	echo "$(UBOOTVERSION)$$($(CONFIG_SHELL) $(srctree)/scripts/setlocalversion $(srctree))"
+	echo "$(UBOOTVERSION)"
 endef
 
 # Store (new) UBOOTRELEASE string in include/config/uboot.release
