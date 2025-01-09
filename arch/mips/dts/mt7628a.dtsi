@@ -231,6 +231,8 @@
 
 			interrupt-parent = <&intc>;
 			interrupts = <24>;
+
+			status = "disabled";
 		};
 
 		intc: interrupt-controller@200 {
@@ -295,6 +297,9 @@
 			compatible = "ralink,mt7621-spi";
 			reg = <0xb00 0x40>;
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&spi_single_pins>;
+
 			resets = <&rstctrl MT7628_SPI_RST>;
 			reset-names = "spi";
 
@@ -338,6 +343,8 @@
 			interrupts = <21>;
 
 			reg-shift = <2>;
+
+			status = "disabled";
 		};
 
 		uart2: uart2@e00 {
@@ -356,6 +363,8 @@
 			interrupts = <22>;
 
 			reg-shift = <2>;
+
+			status = "disabled";
 		};
 	};
 
@@ -383,9 +392,11 @@
 
 		clocks = <&clkctrl CLK_UPHY>;
 		clock-names = "cg";
+
+		status = "disabled";
 	};
 
-	ehci@101c0000 {
+	ehci: ehci@101c0000 {
 		compatible = "generic-ehci";
 		reg = <0x101c0000 0x1000>;
 
@@ -394,6 +405,8 @@
 
 		interrupt-parent = <&intc>;
 		interrupts = <18>;
+
+		status = "disabled";
 	};
 
 	mmc: mmc@10130000 {
