@@ -1,0 +1,195 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7620.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "domywifi,dm203", "mediatek,mt7620-soc";
+	model = "DomyWifi DM203";
+
+	aliases {
+		button-boot1 = &key_reset;
+		led-status1 = &led_green;
+		led-status2 = &led_amber;
+		serial0 = &uartlite;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = &uartlite;
+	};
+
+	config {
+		button-reset-env;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		key_reset: reset {
+			label = "reset";
+			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led_green: led-system_green {
+			label = "green:system";
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+
+		led_amber: led-system_amber {
+			label = "amber:system";
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-internet_green {
+			label = "green:internet";
+			color = <LED_COLOR_ID_GREEN>;
+			function = "internet";
+			gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-internet_amber {
+			label = "amber:internet";
+			color = <LED_COLOR_ID_AMBER>;
+			function = "internet";
+			gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-lan1 {
+			label = "amber:lan1";
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_LAN;
+			function-enumerator = <1>;
+			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-lan2 {
+			label = "amber:lan2";
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_LAN;
+			function-enumerator = <2>;
+			gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-lan3 {
+			label = "amber:lan3";
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_LAN;
+			function-enumerator = <3>;
+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-lan4 {
+			label = "amber:lan4";
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_LAN;
+			function-enumerator = <4>;
+			gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-wan {
+			label = "amber:wan";
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_WAN;
+			gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-wlan {
+			label = "green:wlan";
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_WLAN;
+			gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+};
+
+&gpio1 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <12 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&mmc {
+	status = "okay";
+
+	bus-width = <4>;
+	cap-sd-highspeed;
+};
+
+&spi0 {
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x000000 0x030000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x030000 0x010000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x040000 0x010000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x050000 0xfb0000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	gpios {
+		groups = "i2c", "uartf", "mdio", "rgmii1", "rgmii2", "perst", \
+			 "pa", "wdt rst", "wled";
+		function = "gpio";
+	};
+
+	sd_pins {
+		groups = "nand";
+		function = "sd";
+	};
+
+	pleds {
+		groups = "ephy led";
+		function = "led";
+	};
+};

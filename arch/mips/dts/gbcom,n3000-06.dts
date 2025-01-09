@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7620.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "gbcom,n3000-06", "mediatek,mt7620-soc";
+	model = "GBCOM N3000-06";
+
+	aliases {
+		button-boot1 = &key_reset;
+		led-status1 = &led_status;
+		serial0 = &uartlite;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = &uartlite;
+	};
+
+	config {
+		button-reset-env;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		key_reset: reset {
+			label = "reset";
+			gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led_status: led-status {
+			label = "green:status";
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+	};
+};
+
+&ehci {
+	status = "disabled";
+};
+
+&gpio1 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <12 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&spi0 {
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x000000 0x030000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x030000 0x010000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x040000 0x010000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x050000 0x7b0000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	gpios {
+		groups = "i2c", "uartf", "mdio", "rgmii1", "rgmii2", "perst", \
+			 "nand", "pa", "wdt rst", "wled", "ephy led";
+		function = "gpio";
+	};
+};
+
+&usb_phy {
+	status = "disabled";
+};
