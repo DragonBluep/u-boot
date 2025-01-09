@@ -99,6 +99,9 @@ config BOARD_MT7621_NAND_RFB
 	  sockets, 1 RGMII to external GbE PHY, 2 audio jacks (in/out),
 	  JTAG pins and expansion GPIO pins.
 
+config BOARD_MT7621_GENERIC
+	bool "MediaTek MT7621 generic board"
+
 endchoice
 
 config SYS_CONFIG_NAME
