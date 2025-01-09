@@ -768,6 +768,9 @@ static init_fnc_t init_sequence_r[] = {
 	initr_mem,
 #endif
 	initr_boot_led_on,
+#ifdef CONFIG_BUTTON_BOOTSTRAP
+	mtk_button_bootstrap,
+#endif
 	run_main_loop,
 };
 
