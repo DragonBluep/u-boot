@@ -40,7 +40,7 @@
 		bootph-all;
 	};
 
-	hwver: hwver {
+	hwver: hwver@8000000 {
 		compatible = "mediatek,hwver", "syscon";
 		reg = <0x8000000 0x1000>;
 	};
@@ -259,43 +259,49 @@
 	};
 
 	spi0: spi@1100a000 {
-		compatible = "mediatek,ipm-spi";
+		compatible = "mediatek,spi-ipm";
 		reg = <0x1100a000 0x100>;
-		clocks = <&infracfg CLK_INFRA_SPI0_CK>,
-			 <&topckgen CLK_TOP_SPI_SEL>;
+		clocks = <&topckgen CLK_TOP_CB_M_D2>,
+			 <&topckgen CLK_TOP_SPI_SEL>,
+			 <&infracfg CLK_INFRA_SPI0_CK>,
+			 <&infracfg CLK_INFRA_SPI0_HCK_CK>;
 		assigned-clocks = <&topckgen CLK_TOP_SPI_SEL>,
 				  <&infracfg CLK_INFRA_SPI0_SEL>;
 		assigned-clock-parents = <&topckgen CLK_TOP_CB_M_D2>,
 					 <&topckgen CLK_TOP_SPI_SEL>;
-		clock-names = "spi-clk", "sel-clk";
+		clock-names = "parent-clk", "sel-clk", "spi-clk", "hclk";
 		interrupts = <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
 	};
 
 	spi1: spi@1100b000 {
-		compatible = "mediatek,ipm-spi";
+		compatible = "mediatek,spi-ipm";
 		reg = <0x1100b000 0x100>;
 		interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&infracfg CLK_INFRA_SPI1_CK>,
-			 <&topckgen CLK_TOP_SPIM_MST_SEL>;
+		clocks = <&topckgen CLK_TOP_CB_M_D2>,
+			 <&topckgen CLK_TOP_SPIM_MST_SEL>,
+			 <&infracfg CLK_INFRA_SPI1_CK>,
+			 <&infracfg CLK_INFRA_SPI1_HCK_CK>;
 		assigned-clocks = <&topckgen CLK_TOP_SPIM_MST_SEL>,
 				  <&infracfg CLK_INFRA_SPI1_SEL>;
 		assigned-clock-parents = <&topckgen CLK_TOP_CB_M_D2>,
 					 <&topckgen CLK_TOP_SPIM_MST_SEL>;
-		clock-names = "spi-clk", "sel-clk";
+		clock-names = "parent-clk", "sel-clk", "spi-clk", "hclk";
 		status = "disabled";
 	};
 
 	spi2: spi@11009000 {
-		compatible = "mediatek,ipm-spi";
+		compatible = "mediatek,spi-ipm";
 		reg = <0x11009000 0x100>;
-		clocks = <&infracfg CLK_INFRA_SPI2_CK>,
-			 <&topckgen CLK_TOP_SPI_SEL>;
+		clocks = <&topckgen CLK_TOP_CB_M_D2>,
+			 <&topckgen CLK_TOP_SPI_SEL>,
+			 <&infracfg CLK_INFRA_SPI2_CK>,
+			 <&infracfg CLK_INFRA_SPI2_HCK_CK>;
 		assigned-clocks = <&topckgen CLK_TOP_SPI_SEL>,
 				  <&infracfg CLK_INFRA_SPI2_SEL>;
 		assigned-clock-parents = <&topckgen CLK_TOP_CB_M_D2>,
 					 <&topckgen CLK_TOP_SPI_SEL>;
-		clock-names = "spi-clk", "sel-clk";
+		clock-names = "parent-clk", "sel-clk", "spi-clk", "hclk";
 		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
 		status = "disabled";
 	};
