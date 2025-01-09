@@ -1,0 +1,293 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+#include <dt-bindings/pinctrl/mt65xx.h>
+
+#include "mt7981.dtsi"
+
+/ {
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		tick-timer = &timer0;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&keys_pins>;
+
+		button-reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 1 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&leds_pins>;
+
+		led-blue {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&pio 13 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+
+		led-red {
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&pio 8 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+	};
+
+	options {
+		u-boot {
+			compatible = "u-boot,config";
+			boot-btn1 = "reset";
+			boot-led1 = "blue:status";
+			boot-led2 = "red:status";
+			bootcmd_1-1 = "tftp_boot_ik";
+			bootcmd_1-2 = "tftp_update_fw";
+			bootcmd_1-3 = "switch_console";
+			bootcmd_1-4 = "env init";
+		};
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		ramoops@42ff0000 {
+			compatible = "ramoops";
+			reg = <0x42ff0000 0x00010000>;
+			console-size = <0x8000>;
+			record-size = <0x2000>;
+		};
+
+		secmon@43000000 {
+			reg = <0x43000000 0x00030000>;
+			no-map;
+		};
+	};
+};
+
+&eth {
+	mediatek,gmac-id = <0>;
+	mediatek,switch = "mt7531";
+	phy-mode = "2500base-x";
+	pinctrl-names = "default";
+	pinctrl-0 = <&gbe_pins>, <&mdio_pins>;
+	reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+
+	fixed-link {
+		speed = <2500>;
+		full-duplex;
+	};
+};
+
+&pio {
+	gbe_pins: gbe-pins {
+		conf-int {
+			bias-disable;
+			input-enable;
+			input-schmitt-enable;
+			drive-strength = <MTK_DRIVE_2mA>;
+			pins = "GBE_INT";
+		};
+
+		conf-rst {
+			bias-disable;
+			output-enable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "GBE_RESET";
+		};
+	};
+
+	keys_pins: keys-pins {
+		conf {
+			bias-disable;
+			input-enable;
+			input-schmitt-enable;
+			drive-strength = <MTK_DRIVE_2mA>;
+			pins = "GPIO_RESET";
+		};
+	};
+
+	leds_pins: leds-pins {
+		conf {
+			bias-disable;
+			output-enable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "JTAG_JTRST_N", "WO_JTAG_JTRST_N";
+		};
+	};
+
+	mdio_pins: mdc-mdio-pins {
+		mux {
+			function = "eth";
+			groups = "smi_mdc_mdio";
+		};
+
+		conf-clk {
+			bias-disable;
+			output-enable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "SMI_MDC";
+		};
+
+		conf-io {
+			bias-disable;
+			input-enable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "SMI_MDIO";
+		};
+	};
+
+	spi0_pins: spi0-pins {
+		mux {
+			function = "spi";
+			groups = "spi0", "spi0_wp_hold";
+		};
+
+		conf-clk-cs {
+			bias-disable;
+			output-enable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "SPI0_CLK", "SPI0_CS";
+		};
+
+		conf-dat {
+			bias-disable;
+			input-enable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "SPI0_MOSI", "SPI0_MISO", "SPI0_HOLD", "SPI0_WP";
+		};
+	};
+
+	uart0_pins: uart0-pins {
+		mux {
+			function = "uart";
+			groups = "uart0";
+		};
+
+		conf-rx {
+			bias-disable;
+			input-enable;
+			input-schmitt-enable;
+			drive-strength = <MTK_DRIVE_2mA>;
+			pins = "UART0_RXD";
+		};
+
+		conf-tx {
+			bias-disable;
+			output-enable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "UART0_TXD";
+		};
+	};
+
+	mt7531-int {
+		gpio-hog;
+		gpios = <38 GPIO_ACTIVE_LOW>;
+		input;
+	};
+};
+
+&spi0 {
+	compatible = "mediatek,spi-ipm";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clocks = <&topckgen CLK_TOP_CB_M_D2>,
+		 <&topckgen CLK_TOP_SPI_SEL>,
+		 <&infracfg CLK_INFRA_SPI0_CK>,
+		 <&infracfg CLK_INFRA_SPI0_HCK_CK>;
+	clock-names = "parent-clk", "sel-clk", "spi-clk", "hclk";
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_pins>;
+	status = "okay";
+
+	flash@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <52000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <4>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "bl2";
+				reg = <0x0000000 0x0080000>;
+			};
+
+			partition@80000 {
+				label = "env";
+				reg = <0x0080000 0x0080000>;
+			};
+
+			partition@100000 {
+				label = "u-boot-env";
+				reg = <0x0100000 0x0080000>;
+			};
+
+			partition@180000 {
+				label = "factory";
+				reg = <0x0180000 0x0200000>;
+			};
+
+			partition@380000 {
+				label = "fip";
+				reg = <0x0380000 0x0200000>;
+			};
+
+			partition@580000 {
+				label = "ubi";
+				reg = <0x0580000 0x7000000>;
+			};
+
+			partition@7580000 {
+				label = "reserve";
+				reg = <0x7580000 0x0a80000>;
+			};
+		};
+	};
+};
+
+&u2port0 {
+	status = "disabled";
+};
+
+&u3port0 {
+	status = "disabled";
+};
+
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_pins>;
+	status = "okay";
+};
+
+&usbtphy {
+	status = "disabled";
+};
+
+&xhci {
+	/delete-property/ mediatek,u3p-dis-msk;
+	status = "disabled";
+};

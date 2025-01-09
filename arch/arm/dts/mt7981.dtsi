@@ -40,7 +40,7 @@
 		bootph-all;
 	};
 
-	hwver: hwver {
+	hwver: hwver@8000000 {
 		compatible = "mediatek,hwver", "syscon";
 		reg = <0x8000000 0x1000>;
 	};
