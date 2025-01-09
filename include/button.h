@@ -83,4 +83,7 @@ void process_button_cmds(void);
 static inline void process_button_cmds(void) {}
 #endif /* CONFIG_BUTTON_CMD */
 
+/* Press button to execute different boot commands */
+void button_bootstrap(void);
+
 #endif
