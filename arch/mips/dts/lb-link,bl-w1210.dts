@@ -1,0 +1,154 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7620.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "lb-link,bl-w1210", "mediatek,mt7620-soc";
+	model = "LB-Link BL-W1210";
+
+	aliases {
+		button-boot1 = &key_reset;
+		led-status1 = &led_status;
+		serial0 = &uartlite;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = &uartlite;
+	};
+
+	config {
+		button-reset-env;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		key_reset: reset {
+			label = "reset";
+			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led_status: led-status {
+			label = "lime:status";
+			color = <LED_COLOR_ID_YELLOW>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+
+		led-wlan {
+			label = "lime:wlan";
+			color = <LED_COLOR_ID_YELLOW>;
+			function = LED_FUNCTION_WLAN;
+			gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+};
+
+&eth {
+	pinctrl-names = "default";
+	pinctrl-0 = <&gsw_pins>;
+
+	port5 {
+		phy-mode = "rgmii";
+		phy-addr = <5>;
+		fixed-link {
+			full-duplex;
+			speed = <1000>;
+			mediatek,mt7530;
+			mediatek,mt7530-reset = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&gpio1 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <12 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&pinctrl {
+	gsw_pins: gsw_pins {
+		mdio {
+			groups = "mdio";
+			function = "mdio";
+		};
+
+		rgmii1 {
+			groups = "rgmii1";
+			function = "rgmii1";
+		};
+	};
+};
+
+&spi0 {
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x000000 0x030000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x030000 0x010000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x040000 0x010000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x50000 0xf70000>;
+			};
+
+			partition@fc0000 {
+				label = "oem";
+				reg = <0xfc0000 0x020000>;
+			};
+
+			partition@fe0000 {
+				label = "bdinfo";
+				reg = <0xfe0000 0x010000>;
+			};
+
+			partition@ff0000 {
+				label = "backup";
+				reg = <0xff0000 0x010000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	gpios {
+		groups = "i2c", "uartf", "rgmii2", "perst", "nand", "pa", \
+			 "wdt rst", "wled", "ephy led";
+		function = "gpio";
+	};
+};
