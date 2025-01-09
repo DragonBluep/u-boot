@@ -85,37 +85,168 @@
 		pinctrl-0 = <&state_default>;
 
 		state_default: pin_state {
+			gpio0-gpio_pins {
+				groups = "gpio0";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			i2c-gpio_pins {
+				groups = "i2c";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			uart2-gpio_pins {
+				groups = "uart2";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			uart3-gpio_pins {
+				groups = "uart3";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			jtag-gpio_pins {
+				groups = "jtag";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			wdt-gpio_pins {
+				groups = "wdt";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			perst-gpio_pins {
+				groups = "pcie reset";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			rgmii2-gpio_pins {
+				groups = "rgmii2";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <2>;
+				slew-rate = <0>;
+			};
+
+			sdxc-gpio_pins {
+				groups = "sdxc";
+				function = "gpio";
+				bias-pull-up;
+				input-schmitt-enable;
+				drive-strength = <4>;
+				slew-rate = <0>;
+			};
+
+			spi-nand_pins {
+				groups = "spi";
+				function = "nand";
+				bias-disable;
+				input-schmitt-disable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
+
+			sdxc-nand_pins {
+				groups = "sdxc";
+				function = "nand";
+				bias-disable;
+				input-schmitt-disable;
+				drive-strength = <4>;
+				slew-rate = <1>;
+			};
 		};
 
 		uart1_pins: uart1_pins {
 			groups = "uart1";
 			function = "uart";
+			bias-pull-up;
+			input-schmitt-disable;
+			drive-strength = <4>;
+			slew-rate = <0>;
 		};
 
 		uart2_pins: uart2_pins {
 			groups = "uart2";
 			function = "uart";
+			bias-pull-up;
+			input-schmitt-disable;
+			drive-strength = <4>;
+			slew-rate = <0>;
 		};
 
 		uart3_pins: uart3_pins {
 			groups = "uart3";
 			function = "uart";
+			bias-pull-up;
+			input-schmitt-disable;
+			drive-strength = <4>;
+			slew-rate = <0>;
 		};
 
 		sdxc_pins: sdxc_pins {
 			groups = "sdxc";
 			function = "sdxc";
+			bias-disable;
+			input-schmitt-disable;
+			drive-strength = <6>;
+			slew-rate = <1>;
 		};
 
 		spi_pins: spi_pins {
 			groups = "spi";
 			function = "spi";
+			bias-disable;
+			input-schmitt-disable;
+			drive-strength = <4>;
+			slew-rate = <1>;
 		};
 
 		eth_pins: eth_pins {
+			esw_pins {
+				groups = "esw int";
+				function = "esw int";
+				bias-disable;
+				input-schmitt-disable;
+				drive-strength = <2>;
+				slew-rate = <0>;
+			};
+
 			mdio_pins {
 				groups = "mdio";
 				function = "mdio";
+				bias-disable;
+				input-schmitt-disable;
+				drive-strength = <2>;
+				slew-rate = <1>;
 			};
 
 			rgmii1_pins {
@@ -123,14 +254,13 @@
 				function = "rgmii";
 			};
 
-			esw_pins {
-				groups = "esw int";
-				function = "esw int";
-			};
-
-			mdio_pconf {
-				groups = "mdio";
-				drive-strength = <2>;
+			rgmii2_pins {
+				groups = "rgmii2";
+				function = "rgmii";
+				bias-disable;
+				input-schmitt-disable;
+				drive-strength = <4>;
+				slew-rate = <1>;
 			};
 		};
 	};
