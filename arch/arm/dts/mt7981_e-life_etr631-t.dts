@@ -1,0 +1,269 @@
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+#include <dt-bindings/pinctrl/mt65xx.h>
+
+#include "mt7981.dtsi"
+
+/ {
+	compatible = "e-life,etr631-t", "mediatek,mt7981";
+	model = "E-life ETR631-T";
+
+	chosen {
+		stdout-path = &uart0;
+		tick-timer = &timer0;
+	};
+
+	config {
+		boot-btn1 = "reset";
+		boot-btn2 = "wps";
+		boot-led1 = "green:status";
+		boot-led2 = "red:status";
+		bootcmd_1-1 = "tftp_load_initramfs_loop";
+		bootcmd_1-2 = "tftp_restore_system_loop";
+		bootcmd_1-3 = "setup_netconsole";
+		bootcmd_2-1 = "tftp_load_initramfs_loop";
+		bootcmd_2-2 = "tftp_restore_system_loop";
+		bootcmd_2-3 = "setup_netconsole";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&keys_pins>;
+		pinctrl-names = "default";
+
+		button-reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 1 GPIO_ACTIVE_LOW>;
+		};
+
+		button-wps {
+			label = "wps";
+			linux,code = <KEY_WPS_BUTTON>;
+			gpios = <&pio 0 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+		pinctrl-0 = <&leds_pins>;
+		pinctrl-names = "default";
+
+		led-blue {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&pio 13 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-green {
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&pio 8 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+
+		led-red {
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&pio 34 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
+	memory@40000000 {
+		reg = <0x40000000 0x10000000>;
+		device_type = "memory";
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		ramoops@42ff0000 {
+			compatible = "ramoops";
+			reg = <0x42ff0000 0x00010000>;
+			record-size = <0x1000>;
+		};
+
+		secmon@43000000 {
+			reg = <0x43000000 0x00030000>;
+			no-map;
+		};
+	};
+};
+
+&eth {
+	status = "okay";
+	mediatek,gmac-id = <0>;
+	mediatek,switch = "mt7531";
+	phy-mode = "2500base-x";
+	pinctrl-0 = <&mdio_pins>, <&gbe_pins>;
+	pinctrl-names = "default";
+	reset-gpios = <&pio 39 GPIO_ACTIVE_HIGH>;
+
+	fixed-link {
+		speed = <2500>;
+		full-duplex;
+	};
+};
+
+&pio {
+	gbe_pins: gbe-pins {
+		mux-int {
+			function = "eth";
+			groups = "mt7531_int";
+		};
+
+		conf-int {
+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			input-schmitt-enable;
+			pins = "GBE_INT";
+		};
+
+		conf-rst {
+			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			pins = "GBE_RESET";
+		};
+	};
+
+	keys_pins: keys-pins {
+		conf {
+			bias-disable;
+			input-schmitt-enable;
+			drive-strength = <MTK_DRIVE_2mA>;
+			pins = "GPIO_RESET", "GPIO_WPS";
+		};
+	};
+
+	leds_pins: leds-pins {
+		conf {
+			bias-disable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "JTAG_JTRST_N", "WO_JTAG_JTRST_N", "PCIE_CLK_REQ";
+		};
+	};
+
+	mdio_pins: mdc-mdio-pins {
+		mux {
+			function = "eth";
+			groups = "smi_mdc_mdio";
+		};
+
+		conf {
+			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+			drive-strength = <MTK_DRIVE_2mA>;
+			input-schmitt-disable;
+			pins = "SMI_MDC", "SMI_MDIO";
+		};
+	};
+
+	spi0_pins: spi0-pins {
+		mux {
+			function = "spi";
+			groups = "spi0", "spi0_wp_hold";
+		};
+
+		conf {
+			bias-disable;
+			input-schmitt-disable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "SPI0_CS", "SPI0_HOLD", "SPI0_WP",
+			       "SPI0_CLK", "SPI0_MOSI", "SPI0_MISO";
+		};
+	};
+
+	uart0_pins: uart0-pins {
+		mux {
+			function = "uart";
+			groups = "uart0";
+		};
+
+		conf {
+			bias-disable;
+			input-schmitt-disable;
+			drive-strength = <MTK_DRIVE_4mA>;
+			pins = "UART0_RXD", "UART0_TXD";
+		};
+	};
+};
+
+&spi0 {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	enhance_timing;
+	dma_ext;
+	ipm_design;
+	support_quad;
+	sample_sel = <0>;
+	tick_dly = <2>;
+	pinctrl-0 = <&spi0_pins>;
+	pinctrl-names = "default";
+
+	flash@0 {
+		compatible = "spi-nand";
+		reg = <0>;
+		spi-max-frequency = <52000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <4>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "bl2";
+				reg = <0x00000000 0x00100000>;
+			};
+
+			partition@100000 {
+				label = "u-boot-env";
+				reg = <0x00100000 0x00080000>;
+			};
+
+			partition@160000 {
+				label = "factory";
+				reg = <0x00180000 0x00200000>;
+			};
+
+			partition@380000 {
+				label = "fip";
+				reg = <0x00380000 0x00200000>;
+			};
+
+			partition@580000 {
+				label = "ubi";
+				reg = <0x00580000 0x07000000>;
+			};
+
+			partition@7580000 {
+				label = "reserved";
+				reg = <0x7580000 0x0280000>;
+			};
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+	pinctrl-0 = <&uart0_pins>;
+	pinctrl-names = "default";
+};
+
+&usbtphy {
+	status = "disabled";
+};
+
+&xhci {
+	status = "disabled";
+};
