@@ -340,6 +340,8 @@ int board_late_init(void);
 int board_postclk_init(void); /* after clocks/timebase, before env/serial */
 int board_early_init_r(void);
 
+int mtk_button_bootstrap(void);
+
 /**
  * arch_initr_trap() - Init traps
  *

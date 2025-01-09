@@ -36,6 +36,7 @@ obj-$(CONFIG_USB_STORAGE) += usb_storage.o
 obj-$(CONFIG_USB_ONBOARD_HUB) += usb_onboard_hub.o
 
 # others
+obj-$(CONFIG_BUTTON_BOOTSTRAP) += bootstrap.o
 obj-$(CONFIG_CONSOLE_MUX) += iomux.o
 obj-$(CONFIG_MTD_NOR_FLASH) += flash.o
 obj-$(CONFIG_CMD_KGDB) += kgdb.o kgdb_stubs.o

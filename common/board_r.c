@@ -792,6 +792,9 @@ static void initcall_run_r(void)
 	INITCALL(initr_mem);
 #endif
 	INITCALL(initr_boot_led_on);
+#ifdef CONFIG_BUTTON_BOOTSTRAP
+	INITCALL(mtk_button_bootstrap);
+#endif
 	INITCALL(run_main_loop);
 }
 
