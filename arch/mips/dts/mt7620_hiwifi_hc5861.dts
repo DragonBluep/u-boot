@@ -1,0 +1,217 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7620.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "hiwifi,hc5861", "mediatek,mt7620-soc";
+	model = "HiWiFi HC5861";
+
+	/delete-node/ clock-48m;
+	/delete-node/ serial@10000500;
+	/delete-node/ watchdog@10000120;
+	/delete-node/ usb-phy;
+	/delete-node/ ehci@101c0000;
+	/delete-node/ mmc@10130000;
+
+	aliases {
+		serial0 = &uartlite;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		button-reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led-status {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio0 9 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+
+		led-internet {
+			color = <LED_COLOR_ID_BLUE>;
+			function = "internet";
+			gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-usb {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_USB;
+			gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-wlan0 {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_WLAN;
+			function-enumerator = <0>;
+			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-wlan1 {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_WLAN;
+			function-enumerator = <1>;
+			gpios = <&gpio0 11 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
+	options {
+		u-boot {
+			compatible = "u-boot,config";
+			boot-btn1 = "reset";
+			boot-led1 = "blue:status";
+			bootcmd_1-1 = "tftp_boot_ik";
+			bootcmd_1-2 = "tftp_update_fw";
+			bootcmd_1-3 = "switch_console";
+			bootcmd_1-4 = "env init";
+		};
+	};
+};
+
+&eth {
+	pinctrl-names = "default";
+	pinctrl-0 = <&gsw_pins>;
+
+	port5 {
+		phy-addr = <5>;
+		phy-mode = "rgmii";
+	};
+};
+
+&gpio0 {
+	pa0-enable {
+		gpio-hog;
+		gpios = <20 GPIO_ACTIVE_HIGH>;
+		output-low;
+	};
+
+	pa1-enable {
+		gpio-hog;
+		gpios = <21 GPIO_ACTIVE_HIGH>;
+		output-low;
+	};
+
+	sd-power {
+		gpio-hog;
+		gpios = <8 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+
+	usb-power {
+		gpio-hog;
+		gpios = <13 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&gpio1 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <12 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&pinctrl {
+	pinctrl-0 = <&state_default>, <&sd_pins>;
+
+	/delete-node/ nand_pins;
+	/delete-node/ spi_dual_pins;
+	/delete-node/ uartf_pins;
+	/delete-node/ uartf_pcm_pins;
+	/delete-node/ uartf_i2s_pins;
+	/delete-node/ uartf_gpio_pins;
+
+	gsw_pins: gsw_pins {
+		mdio {
+			groups = "mdio";
+			function = "mdio";
+		};
+
+		rgmii1 {
+			groups = "rgmii1";
+			function = "rgmii1";
+		};
+	};
+};
+
+&spi0 {
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <26000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x000000 0x030000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x030000 0x010000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x040000 0x010000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x50000 0xf70000>;
+			};
+
+			partition@fc0000 {
+				label = "oem";
+				reg = <0xfc0000 0x020000>;
+			};
+
+			partition@fe0000 {
+				label = "bdinfo";
+				reg = <0xfe0000 0x010000>;
+			};
+
+			partition@ff0000 {
+				label = "backup";
+				reg = <0xff0000 0x010000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	gpios {
+		groups = "i2c", "uartf", "rgmii2", "perst", "pa", "wdt rst", \
+			 "wled", "ephy led";
+		function = "gpio";
+	};
+};
