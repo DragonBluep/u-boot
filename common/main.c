@@ -62,6 +62,9 @@ void main_loop(void)
 			efi_launch_capsules();
 	}
 
+	if (IS_ENABLED(CONFIG_BUTTON_BOOTSTRAP))
+		button_bootstrap();
+
 	process_button_cmds();
 
 	s = bootdelay_process();
