@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7621.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "mercury,mac2600r", "mediatek,mt7621-soc";
+	model = "MERCURY MAC2600R";
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &spi;
+	};
+
+	chosen {
+		stdout-path = &uart0;
+	};
+
+	config {
+		boot-btn1 = "reset";
+		boot-led1 = "white:status";
+		bootcmd_1-1 = "tftp_load_initramfs_loop";
+		bootcmd_1-2 = "tftp_restore_system_loop";
+		bootcmd_1-3 = "config_netconsole";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		button-reset {
+			label = "reset";
+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led-status {
+			color = <LED_COLOR_ID_WHITE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+	};
+};
+
+&eth_pins {
+	/delete-node/ rgmii2_pins;
+};
+
+&gpio0 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <19 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&spi {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x000000 0x030000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x030000 0x010000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x040000 0x010000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x050000 0xfb0000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	/delete-node/ spi-nand_pins;
+	/delete-node/ sdxc-nand_pins;
+};
