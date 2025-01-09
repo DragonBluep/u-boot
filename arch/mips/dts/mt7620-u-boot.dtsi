@@ -5,6 +5,10 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
+&reboot {
+	bootph-all;
+};
+
 &uartlite {
 	bootph-all;
 };
