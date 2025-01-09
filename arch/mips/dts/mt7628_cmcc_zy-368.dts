@@ -1,0 +1,145 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7628a.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "cmcc,zy-368", "mediatek,mt7628-soc";
+	model = "CMCC ZY-368";
+
+	/delete-node/ clock-48m;
+	/delete-node/ watchdog@10000100;
+	/delete-node/ serial@10000d00;
+	/delete-node/ serial@10000e00;
+	/delete-node/ usb-phy@10120000;
+	/delete-node/ ehci@101c0000;
+	/delete-node/ mmc@10130000;
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		button-reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led-wlan {
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_WLAN;
+			gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+	};
+
+	options {
+		u-boot {
+			compatible = "u-boot,config";
+			boot-btn1 = "reset";
+			boot-led1 = "blue:wlan";
+			bootcmd_1-1 = "tftp_boot_ik";
+			bootcmd_1-2 = "tftp_update_fw";
+			bootcmd_1-3 = "switch_console";
+			bootcmd_1-4 = "env init";
+		};
+	};
+};
+
+&eth {
+	mediatek,wan-port = <4>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&ephy_router_mode>, <&ephy_leds>;
+};
+
+&pinctrl {
+	pinctrl-0 = <&state_default>, <&fem_pins>;
+
+	/delete-node/ spi_dual_pins;
+	/delete-node/ uart1_pins;
+	/delete-node/ uart2_pins;
+	/delete-node/ uart2_pwm_pins;
+	/delete-node/ i2c_pins;
+	/delete-node/ ephy_iot_mode;
+	/delete-node/ sd_iot_mode;
+	/delete-node/ sd_router_mode;
+	/delete-node/ emmc_iot_8bit_mode;
+
+	ephy_leds: ephy_leds {
+		groups = "p0led_a", "p1led_a", "p2led_a", "p4led_a";
+		function = "led";
+	};
+
+	/* PA/LNA: GPIO#2 GPIO#13 */
+	fem_pins: fem_pins {
+		lna {
+			groups = "uart1";
+			function = "sw_r";
+		};
+
+		pa {
+			groups = "i2s";
+			function = "antenna";
+		};
+	};
+};
+
+&spi0 {
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <35000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x00000 0x30000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x30000 0x10000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x40000 0x10000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x50000 0x00000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	gpios {
+		groups = "gpio0", "spis", "spi cs1", "sdmode", "wdt", "perst", \
+			 "refclk", "i2c", "uart2", "pwm0", "pwm1", "wled_a", "p3led_a";
+		function = "gpio";
+	};
+};
