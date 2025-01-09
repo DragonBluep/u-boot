@@ -22,6 +22,39 @@ config BOARD_MT7620_MT7530_RFB
 	  intergrated DDR2 KGD, 16 MiB SPI-NOR flash, an external 5-port giga
 	  switch MT7530 and 1 UART.
 
+config BOARD_DOMYWIFI_DM203
+	bool "DomyWifi DM203 Wireless Router"
+
+config BOARD_FOCUSMEDIA_MT7620A
+	bool "FocusMedia MT7620A Wireless Router"
+
+config BOARD_GBCOM_N3000
+	bool "GBCOM N3000-06 Wireless Router"
+
+config BOARD_HAIER_HWL1W
+	bool "Haier HW-L1W Wireless Router"
+
+config BOARD_HIWIFI_HC5661
+	bool "HiWiFi HC5661 Wireless Router"
+
+config BOARD_HIWIFI_HC5861
+	bool "HiWiFi HC5861 Wireless Router"
+
+config BOARD_LBLINK_BLW1210
+	bool "LB-Link BL-W1210 Wireless Router"
+
+config BOARD_PHICOMM_K2
+	bool "Phicomm K2 Wireless Router"
+
+config BOARD_PHICOMM_K2G
+	bool "Phicomm K2G Wireless Router"
+
+config BOARD_YOUKU_X2
+	bool "Youku X2 Wireless Router"
+
+config BOARD_YOUKU_YKL1C
+	bool "Youku YK-L1c Wireless Router"
+
 endchoice
 
 choice

@@ -1,11 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0
+
+/dts-v1/;
+
 #include <dt-bindings/clock/mt7620-clk.h>
 #include <dt-bindings/reset/mt7620-reset.h>
 
 / {
+	compatible = "mediatek,mt7620-soc";
 	#address-cells = <1>;
 	#size-cells = <1>;
-	compatible = "mediatek,mt7620-soc";
+
+	aliases {
+		serial0 = &uartlite;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = &uartlite;
+	};
 
 	cpus {
 		#address-cells = <1>;
@@ -232,6 +244,8 @@
 		#size-cells = <0>;
 
 		clocks = <&clkctrl CLK_SPI>;
+
+		num-cs = <2>;
 	};
 
 	eth: eth@10100000 {
@@ -251,8 +265,6 @@
 			 <&clkctrl CLK_ESW>,
 			 <&clkctrl CLK_FE>;
 		clock-names = "ephy", "esw", "fe";
-
-		status = "disabled";
 	};
 
 	usb_phy: mt7620-usb-phy {
@@ -269,7 +281,7 @@
 		reset-names = "uhst", "udev";
 	};
 
-	ehci@101c0000 {
+	ehci: ehci@101c0000 {
 		compatible = "generic-ehci";
 		reg = <0x101c0000 0x1000>;
 
@@ -282,6 +294,8 @@
 		reg = <0x10130000 0x4000>;
 		builtin-cd = <1>;
 		r_smpl = <1>;
+		bus-width = <4>;
+		cap-sd-highspeed;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&sd_pins>;
