@@ -99,6 +99,39 @@ config BOARD_MT7621_NAND_RFB
 	  sockets, 1 RGMII to external GbE PHY, 2 audio jacks (in/out),
 	  JTAG pins and expansion GPIO pins.
 
+config BOARD_ASUS_RTAC1200GU
+	bool "ASUS RT-AC1200GU Wireless Router"
+
+config BOARD_DLINK_DIR878A1
+	bool "D-Link DIR-878 A1 Wireless Router"
+
+config BOARD_H3C_TX1801PLUS
+	bool "H3C TX1801 Plus Wireless Router"
+
+config BOARD_H3C_TX1806
+	bool "H3C TX1806 Wireless Router"
+
+config BOARD_JDCLOUD_RESP01B
+	bool "JDCloud RE-SP-01B Wireless Router"
+
+config BOARD_LINKSURE_SG5
+	bool "LinkSure SG5 Wireless Router"
+
+config BOARD_MERCURY_MAC2600R
+	bool "MERCURY MAC2600R Wireless Router"
+
+config BOARD_RAISECOM_MSG1500X00
+	bool "RAISECOM MSG1500 X.00 Wireless Router"
+
+config BOARD_SIM_SIMAX1800T
+	bool "SIM SIMAX1800T Wireless Router"
+
+config BOARD_SKSPRUCE_WIA330010
+	bool "SKSpruce WIA3300-10 Wireless Router"
+
+config BOARD_ZTE_E8820V2
+	bool "ZTE E8820 V2 Wireless Router"
+
 endchoice
 
 config SYS_CONFIG_NAME
