@@ -1,11 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0
+
+/dts-v1/;
+
 #include <dt-bindings/clock/mt7628-clk.h>
 #include <dt-bindings/reset/mt7628-reset.h>
 
 / {
+	compatible = "ralink,mt7628a-soc";
 	#address-cells = <1>;
 	#size-cells = <1>;
-	compatible = "ralink,mt7628a-soc";
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = &uart0;
+	};
 
 	cpus {
 		#address-cells = <1>;
@@ -295,6 +307,9 @@
 			compatible = "ralink,mt7621-spi";
 			reg = <0xb00 0x40>;
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&spi_single_pins>;
+
 			resets = <&rstctrl MT7628_SPI_RST>;
 			reset-names = "spi";
 
@@ -302,6 +317,8 @@
 			#size-cells = <0>;
 
 			clocks = <&clkctrl CLK_SPI>;
+
+			num-cs = <2>;
 		};
 
 		uart0: uartlite@c00 {
@@ -338,6 +355,8 @@
 			interrupts = <21>;
 
 			reg-shift = <2>;
+
+			status = "disabled";
 		};
 
 		uart2: uart2@e00 {
@@ -356,6 +375,8 @@
 			interrupts = <22>;
 
 			reg-shift = <2>;
+
+			status = "disabled";
 		};
 	};
 
@@ -383,9 +404,11 @@
 
 		clocks = <&clkctrl CLK_UPHY>;
 		clock-names = "cg";
+
+		status = "disabled";
 	};
 
-	ehci@101c0000 {
+	ehci: ehci@101c0000 {
 		compatible = "generic-ehci";
 		reg = <0x101c0000 0x1000>;
 
@@ -394,6 +417,8 @@
 
 		interrupt-parent = <&intc>;
 		interrupts = <18>;
+
+		status = "disabled";
 	};
 
 	mmc: mmc@10130000 {
@@ -406,6 +431,9 @@
 		clock-names = "source", "hclk";
 
 		resets = <&rstctrl MT7628_SDXC_RST>;
+
+		bus-width = <4>;
+		cap-sd-highspeed;
 
 		status = "disabled";
 	};
