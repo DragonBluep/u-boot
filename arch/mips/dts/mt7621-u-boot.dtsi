@@ -37,6 +37,7 @@
 	bootph-all;
 };
 
+#ifndef CONFIG_BOARD_MT7621_GENERIC
 &uart1 {
 	bootph-all;
 };
@@ -44,6 +45,7 @@
 &uart2 {
 	bootph-all;
 };
+#endif
 
 &binman {
 	u-boot-spl-ddr {
