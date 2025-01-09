@@ -5,10 +5,16 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
+&reboot {
+	bootph-all;
+};
+
 &uartlite {
 	bootph-all;
 };
 
+#ifndef CONFIG_BOARD_MT7620_GENERIC
 &uartfull {
 	bootph-all;
 };
+#endif
