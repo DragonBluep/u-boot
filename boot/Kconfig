@@ -51,6 +51,11 @@ config SPL_LIB_BOOTM
 config SPL_LIB_BOOTZ
 	bool
 
+config BUTTON_BOOTSTRAP
+	bool "Run different boot commands by pressing button"
+	select BUTTON
+	select LED
+
 config BUTTON_CMD
 	bool "Support for running a command if a button is held during boot"
 	depends on CMDLINE
