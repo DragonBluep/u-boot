@@ -1,0 +1,142 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7621.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "jdcloud,re-sp-01b", "mediatek,mt7621-soc";
+	model = "JDCloud RE-SP-01B";
+
+	aliases {
+		button-boot1 = &key_reset;
+		led-status1 = &led_green;
+		led-status2 = &led_red;
+		serial0 = &uart0;
+		spi0 = &spi;
+	};
+
+	chosen {
+		stdout-path = &uart0;
+	};
+
+	config {
+		button-reset-env;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		key_reset: reset {
+			label = "reset";
+			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led-blue {
+			label = "blue:status";
+			color = <LED_COLOR_ID_BLUE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led_green: led-green {
+			label = "green:status";
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+
+		led_red: led-red {
+			label = "red:status";
+			color = <LED_COLOR_ID_RED>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+};
+
+&gpio0 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <19 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&mmc {
+	status = "okay";
+
+	cap-sd-highspeed;
+};
+
+&spi {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0000000 0x0030000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x0030000 0x0010000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x0040000 0x0010000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x0050000 0x1fb0000>;
+			};
+		};
+	};
+};
+
+&ssusb {
+	status = "okay";
+};
+
+&state_default {
+	/delete-node/ rgmii2-gpio_pins;
+	/delete-node/ spi-nand_pins;
+	/delete-node/ sdxc-nand_pins;
+	/delete-node/ sdxc-gpio_pins;
+
+	sdxc_pins {
+		groups = "sdxc";
+		function = "sdxc";
+		bias-pull-up;
+		input-schmitt-disable;
+		drive-strength = <6>;
+		slew-rate = <0>;
+	};
+};
+
+&u3phy {
+	status = "okay";
+};

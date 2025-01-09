@@ -1,0 +1,139 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7621.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "dlink,dir-878-a1", "mediatek,mt7621-soc";
+	model = "D-Link DIR-878 A1";
+
+	aliases {
+		button-boot1 = &key_reset;
+		button-boot2 = &key_wps;
+		led-status1 = &led_green;
+		led-status2 = &led_amber;
+		serial0 = &uart0;
+		spi0 = &spi;
+	};
+
+	chosen {
+		stdout-path = &uart0;
+	};
+
+	config {
+		button-reset-env;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		key_reset: reset {
+			label = "reset";
+			gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+
+		wifi {
+			label = "wifi";
+			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RFKILL>;
+		};
+
+		key_wps: wps {
+			label = "wps";
+			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WPS_BUTTON>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led-internet_amber {
+			label = "amber:internet";
+			color = <LED_COLOR_ID_AMBER>;
+			function = "internet";
+			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-internet_green {
+			label = "green:internet";
+			color = <LED_COLOR_ID_GREEN>;
+			function = "internet";
+			gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led_amber: led-power_amber {
+			label = "amber:power";
+			color = <LED_COLOR_ID_AMBER>;
+			function = LED_FUNCTION_POWER;
+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led_green: led-power_green {
+			label = "green:power";
+			color = <LED_COLOR_ID_GREEN>;
+			function = LED_FUNCTION_POWER;
+			gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+	};
+};
+
+&gpio0 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <19 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&spi {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <50000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x000000 0x030000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x030000 0x010000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x040000 0x020000>;
+			};
+
+			partition@60000 {
+				label = "firmware";
+				reg = <0x060000 0xfa0000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	/delete-node/ rgmii2-gpio_pins;
+	/delete-node/ spi-nand_pins;
+	/delete-node/ sdxc-nand_pins;
+};

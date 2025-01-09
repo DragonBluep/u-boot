@@ -1,0 +1,33 @@
+baudrate=115200
+ipaddr=192.168.1.1
+serverip=192.168.1.254
+ethaddr=aa:bb:cc:dd:ee:ff
+loadaddr=0x83000000
+bootcmd=run nor_read_firmware && bootm $loadaddr
+bootfile_initramfs=initramfs.bin
+bootfile_firmware=firmware.bin
+bootfile_uboot=u-boot.bin
+bootmenu_0=[36m[1mRun default boot command[0m=run boot_default
+bootmenu_1=[36m[1mBoot system from Flash[0m=run bootcmd ; run bootmenu_confirm_return
+bootmenu_2=[32m[1mBoot system from TFTP[0m=run boot_tftp_load_initramfs ; run bootmenu_confirm_return
+bootmenu_3=[32m[1mLoad system via TFTP then write to flash[0m=run boot_tftp_write_system ; run bootmenu_confirm_return
+bootmenu_4=[33m[1mLoad U-Boot via TFTP then write to flash[0m=run boot_tftp_write_uboot ; run bootmenu_confirm_return
+bootmenu_5=[33m[1mLoad U-Boot via TTL then write to flash[0m=run boot_uart_write_uboot ; run bootmenu_confirm_return
+bootmenu_6=[31m[1mReboot[0m=reset
+bootmenu_confirm_return=askenv - [35m[1mPress ENTER to return to menu![0m ; bootmenu 60
+boot_default=if test -n $bootmode && test $bootmode != normal ; then run boot_entry1 ; else run bootcmd ; fi
+boot_entry1=if test $bootmode = recovery ; then run boot_tftp_write_system_forever ; else run boot_entry2 ; fi
+boot_entry2=if test $bootmode = initramfs ; then run boot_tftp_load_initramfs_forever ; else run bootcmd ; fi
+boot_netconsole=setenv ncip $serverip && setenv stdin nc && setenv stdout nc && setenv stderr nc && ?
+boot_tftp_load_initramfs=tftpboot $loadaddr $bootfile_initramfs && bootm $loadaddr
+boot_tftp_load_initramfs_forever=while true ; do run boot_tftp_load_initramfs ; sleep 3 ; done
+boot_tftp_write_system=tftpboot $loadaddr $bootfile_firmware && iminfo $loadaddr && run nor_write_firmware && bootm $loadaddr
+boot_tftp_write_system_forever=while true ; do run boot_tftp_write_system ; sleep 3 ; done
+boot_tftp_write_uboot=tftpboot $loadaddr $bootfile_uboot && run nor_write_uboot
+boot_uart_write_uboot=loadx $loadaddr $baudrate && run nor_write_uboot
+nor_read_firmware=mtd read firmware $loadaddr 0x0 0x10000 && imsz $loadaddr image_size && mtd read firmware $loadaddr 0x0 $image_size && setenv image_size
+nor_verify_uboot=mtd read u-boot $loadaddr && md5sum $loadaddr 0x$filesize
+nor_write_cal_ersize=setexpr ersize 0x$filesize + 0xffff && setexpr ersize 0x$ersize / 0x10000 && setexpr ersize 0x$ersize * 0x10000
+nor_write_confirm=askenv confirm [35m[1mPress Y then ENTER to confirm write to flash![0m 0x1 && flag=$confirm && setenv confirm && test x$flag = xY
+nor_write_firmware=run nor_write_cal_ersize && mtd erase firmware 0x0 0x$ersize && setenv ersize && mtd write firmware $loadaddr 0x0 0x$filesize
+nor_write_uboot=md5sum $loadaddr 0x$filesize && run nor_write_confirm && mtd erase u-boot && mtd write u-boot $loadaddr 0x0 0x$filesize && run nor_verify_uboot
