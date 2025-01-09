@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7620.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	compatible = "focusmedia,mt7620a", "mediatek,mt7620-soc";
+	model = "Focus Media MT7620A";
+
+	/delete-node/ clock-48m;
+	/delete-node/ serial@10000500;
+	/delete-node/ watchdog@10000120;
+	/delete-node/ usb-phy;
+	/delete-node/ ehci@101c0000;
+	/delete-node/ mmc@10130000;
+
+	aliases {
+		serial0 = &uartlite;
+		spi0 = &spi0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+};
+
+&gpio1 {
+	pcie-reset {
+		gpio-hog;
+		gpios = <12 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&pinctrl {
+	/delete-node/ nand_pins;
+	/delete-node/ sd_pins;
+	/delete-node/ spi_dual_pins;
+	/delete-node/ uartf_pins;
+	/delete-node/ uartf_pcm_pins;
+	/delete-node/ uartf_i2s_pins;
+	/delete-node/ uartf_gpio_pins;
+};
+
+&spi0 {
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <26000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x00000 0x30000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x30000 0x10000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x40000 0x10000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x50000 0x00000>;
+			};
+		};
+	};
+};
+
+&state_default {
+	gpios {
+		groups = "i2c", "uartf", "mdio", "rgmii1", "rgmii2", "perst", \
+			 "nand", "pa", "wdt rst", "wled", "ephy led";
+		function = "gpio";
+	};
+};
