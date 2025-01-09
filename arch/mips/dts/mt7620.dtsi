@@ -13,12 +13,12 @@
 
 		cpu@0 {
 			compatible = "mti,mips24KEc";
-			device_type = "cpu";
 			reg = <0>;
+			device_type = "cpu";
 		};
 	};
 
-	clk48m: clk48m@0 {
+	clk48m: clock-48m {
 		compatible = "fixed-clock";
 
 		clock-frequency = <48000000>;
@@ -31,7 +31,7 @@
 		reg = <0x10000000 0x100>;
 	};
 
-	clkctrl: clkctrl@10000030 {
+	clkctrl: clkctrl {
 		compatible = "mediatek,mt7620-clk";
 		mediatek,sysc = <&sysc>;
 
@@ -51,9 +51,9 @@
 		reset-names = "sysreset";
 	};
 
-	uartfull: uartfull@10000500 {
+	uartfull: serial@10000500 {
 		compatible = "mediatek,mt7620-uart";
-		reg = <10000500 0x100>;
+		reg = <0x10000500 0x100>;
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&uartf_gpio_pins>;
@@ -68,7 +68,7 @@
 		status = "disabled";
 	};
 
-	uartlite: uartlite@10000c00 {
+	uartlite: serial@10000c00 {
 		compatible = "mediatek,mt7620-uart";
 		reg = <0x10000c00 0x100>;
 
@@ -156,6 +156,8 @@
 
 		resets = <&rstctrl TIMER_RST>;
 		reset-names = "wdt";
+
+		status = "disabled";
 	};
 
 	gpio0: gpio0@10000600 {
@@ -251,11 +253,9 @@
 			 <&clkctrl CLK_ESW>,
 			 <&clkctrl CLK_FE>;
 		clock-names = "ephy", "esw", "fe";
-
-		status = "disabled";
 	};
 
-	usb_phy: mt7620-usb-phy {
+	usb_phy: usb-phy {
 		compatible = "mediatek,mt7620-usbphy";
 
 		#phy-cells = <0>;
@@ -267,20 +267,26 @@
 
 		resets = <&rstctrl UHST_RST>, <&rstctrl UDEV_RST>;
 		reset-names = "uhst", "udev";
+
+		status = "disabled";
 	};
 
-	ehci@101c0000 {
+	ehci: ehci@101c0000 {
 		compatible = "generic-ehci";
 		reg = <0x101c0000 0x1000>;
 
 		phys = <&usb_phy>;
 		phy-names = "usb";
+
+		status = "disabled";
 	};
 
 	mmc: mmc@10130000 {
 		compatible = "mediatek,mt7620-mmc";
 		reg = <0x10130000 0x4000>;
 		builtin-cd = <1>;
+		bus-width = <4>;
+		cap-sd-highspeed;
 		r_smpl = <1>;
 
 		pinctrl-names = "default";

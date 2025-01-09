@@ -9,6 +9,8 @@
 	bootph-all;
 };
 
+#ifndef CONFIG_BOARD_MT7620_GENERIC
 &uartfull {
 	bootph-all;
 };
+#endif

@@ -22,6 +22,9 @@ config BOARD_MT7620_MT7530_RFB
 	  intergrated DDR2 KGD, 16 MiB SPI-NOR flash, an external 5-port giga
 	  switch MT7530 and 1 UART.
 
+config BOARD_MT7620_GENERIC
+	bool "MediaTek MT7620 generic board"
+
 endchoice
 
 choice
@@ -67,10 +70,10 @@ config CPU_FREQ_MULTI
 	default 7 if CPU_FREQ_620MHZ
 
 config SYS_CONFIG_NAME
-	default "mt7620" if  BOARD_MT7620_RFB || BOARD_MT7620_MT7530_RFB
+	default "mt7620"
 
 config SYS_BOARD
 	string "Board name"
-	default "mt7620" if  BOARD_MT7620_RFB || BOARD_MT7620_MT7530_RFB
+	default "mt7620"
 
 endif
