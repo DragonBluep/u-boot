@@ -156,6 +156,8 @@
 
 		resets = <&rstctrl TIMER_RST>;
 		reset-names = "wdt";
+
+		status = "disabled";
 	};
 
 	gpio0: gpio0@10000600 {
@@ -251,8 +253,6 @@
 			 <&clkctrl CLK_ESW>,
 			 <&clkctrl CLK_FE>;
 		clock-names = "ephy", "esw", "fe";
-
-		status = "disabled";
 	};
 
 	usb_phy: mt7620-usb-phy {
@@ -269,7 +269,7 @@
 		reset-names = "uhst", "udev";
 	};
 
-	ehci@101c0000 {
+	ehci: ehci@101c0000 {
 		compatible = "generic-ehci";
 		reg = <0x101c0000 0x1000>;
 
