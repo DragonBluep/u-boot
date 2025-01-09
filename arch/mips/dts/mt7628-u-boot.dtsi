@@ -5,10 +5,6 @@
  * Author: Weijie Gao <weijie.gao@mediatek.com>
  */
 
-&palmbus {
-	bootph-all;
-};
-
 &reboot {
 	bootph-all;
 };
@@ -29,6 +25,7 @@
 	bootph-all;
 };
 
+#ifndef CONFIG_BOARD_MT7628_GENERIC
 &uart1 {
 	bootph-all;
 };
@@ -36,3 +33,4 @@
 &uart2 {
 	bootph-all;
 };
+#endif

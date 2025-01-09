@@ -35,6 +35,9 @@ config BOARD_VOCORE2
 	  VoCore VoCore2 board has a MT7628 SoC with 128 MiB of RAM
 	  and 16 MiB of flash (SPI).
 
+config BOARD_MT7628_GENERIC
+	bool "MediaTek MT7628 generic board"
+
 endchoice
 
 config SPL_UART2_SPIS_PINMUX
@@ -46,10 +49,10 @@ config SPL_UART2_SPIS_PINMUX
 
 config SYS_BOARD
 	string "Board name"
-	default "mt7628" if BOARD_MT7628_RFB
+	default "mt7628"
 
 config SYS_CONFIG_NAME
-	default "mt7628" if BOARD_MT7628_RFB
+	default "mt7628"
 
 source "board/gardena/smart-gateway-mt7688/Kconfig"
 source "board/seeed/linkit-smart-7688/Kconfig"
