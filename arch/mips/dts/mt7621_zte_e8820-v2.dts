@@ -1,0 +1,153 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+/dts-v1/;
+
+#include "mt7621.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "zte,e8820-v2", "mediatek,mt7621-soc";
+	model = "ZTE E8820 V2";
+
+	/delete-node/ clock-48m;
+	/delete-node/ clock-50m;
+	/delete-node/ watchdog@1e000100;
+	/delete-node/ serial@1e000d00;
+	/delete-node/ serial@1e000e00;
+	/delete-node/ mmc@1e130000;
+	/delete-node/ usb@1e1c0000;
+	/delete-node/ usb-phy@1e1d0000;
+
+	aliases {
+		serial0 = &uart0;
+		spi0 = &spi;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+
+		button-reset {
+			label = "reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
+		};
+
+		button-wps {
+			label = "wps";
+			linux,code = <KEY_WPS_BUTTON>;
+			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		led-power {
+			color = <LED_COLOR_ID_WHITE>;
+			function = LED_FUNCTION_POWER;
+			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-status {
+			color = <LED_COLOR_ID_WHITE>;
+			function = LED_FUNCTION_STATUS;
+			gpios = <&gpio0 31 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+		};
+	};
+
+	options {
+		u-boot {
+			compatible = "u-boot,config";
+			boot-btn1 = "reset";
+			boot-btn2 = "wps";
+			boot-led1 = "white:status";
+			bootcmd_1-1 = "tftp_boot_ik";
+			bootcmd_1-2 = "tftp_update_fw";
+			bootcmd_1-3 = "switch_console";
+			bootcmd_1-4 = "env init";
+			bootcmd_2-1 = "tftp_boot_ik";
+			bootcmd_2-2 = "tftp_update_fw";
+			bootcmd_2-3 = "switch_console";
+			bootcmd_2-4 = "env init";
+		};
+	};
+};
+
+&eth_pins {
+	/delete-node/ rgmii2_pins;
+};
+
+&gpio0 {
+	/* PCIE0 reset */
+	pcie-reset0 {
+		gpio-hog;
+		gpios = <19 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+
+	/* PCIe0 external system reset */
+	pcie-reset1 {
+		gpio-hog;
+		gpios = <22 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+
+	/* PCIe1 reset & external system reset */
+	pcie-reset2 {
+		gpio-hog;
+		gpios = <26 GPIO_ACTIVE_LOW>;
+		output-high;
+	};
+};
+
+&pinctrl {
+	/delete-node/ uart2_pins;
+	/delete-node/ uart3_pins;
+	/delete-node/ sdxc_pins;
+	/delete-node/ nand_pins;
+};
+
+&spi {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x00000 0x30000>;
+			};
+
+			partition@30000 {
+				label = "u-boot-env";
+				reg = <0x30000 0x10000>;
+			};
+
+			partition@40000 {
+				label = "factory";
+				reg = <0x40000 0x10000>;
+			};
+
+			partition@50000 {
+				label = "firmware";
+				reg = <0x50000 0x00000>;
+			};
+		};
+	};
+};
