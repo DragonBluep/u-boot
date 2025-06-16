@@ -109,10 +109,12 @@ source (ulong addr, const char *fit_uname)
 			return 1;
 		}
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 		if (!fit_image_check_type (fit_hdr, noffset, IH_TYPE_SCRIPT)) {
 			puts ("Not a image image\n");
 			return 1;
 		}
+#endif
 
 		/* verify integrity */
 		if (verify) {

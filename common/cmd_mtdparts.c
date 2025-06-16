@@ -411,8 +411,7 @@ static int part_validate(struct mtdids *id, struct part_info *part)
 	}
 
 	if (part->offset + part->size > id->size) {
-		printf("%s: partitioning exceeds flash size\n", id->mtd_id);
-		return 1;
+		printf("%s: partitioning (%s) exceeds flash size\n", id->mtd_id, part->name);
 	}
 
 	/*
@@ -1900,6 +1899,7 @@ static struct part_info* mtd_part_info(struct mtd_device *dev, unsigned int part
 	return NULL;
 }
 
+#ifndef CONFIG_CMD_DISABLE_CHPART
 /***************************************************/
 /* U-boot commands				   */
 /***************************************************/
@@ -1941,6 +1941,15 @@ static int do_chpart(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	return 0;
 }
+
+/***************************************************/
+U_BOOT_CMD(
+	chpart,	2,	0,	do_chpart,
+	"change active partition",
+	"part-id\n"
+	"    - change active partition (e.g. part-id = nand0,1)"
+);
+#endif
 
 /**
  * Routine implementing u-boot mtdparts command. Initialize/update default global
@@ -2068,14 +2077,6 @@ static int do_mtdparts(cmd_tbl_t *cmdtp, int flag, int argc,
 
 	return CMD_RET_USAGE;
 }
-
-/***************************************************/
-U_BOOT_CMD(
-	chpart,	2,	0,	do_chpart,
-	"change active partition",
-	"part-id\n"
-	"    - change active partition (e.g. part-id = nand0,1)"
-);
 
 #ifdef CONFIG_SYS_LONGHELP
 static char mtdparts_help_text[] =

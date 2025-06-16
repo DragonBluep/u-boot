@@ -42,6 +42,9 @@
 #ifdef IPQ_UBI_VOL_WRITE_SUPPORT
 static struct ubi_device *ubi;
 #endif
+
+extern unsigned int get_spi_flash_size(void);
+
 typedef struct smem_pmic_type
 {
 	unsigned pmic_model;
@@ -514,8 +517,7 @@ int smem_bootconfig_info(void)
 			&qca_smem_bootconfig_info, sizeof(qca_smem_bootconfig_info_t));
 	if ((ret != 0) ||
 		((qca_smem_bootconfig_info.magic_start != _SMEM_DUAL_BOOTINFO_MAGIC_START) &&
-		(qca_smem_bootconfig_info.magic_start != _SMEM_DUAL_BOOTINFO_MAGIC_START_TRYMODE)) ||
-		(qca_smem_bootconfig_info.magic_end != _SMEM_DUAL_BOOTINFO_MAGIC_END))
+		(qca_smem_bootconfig_info.magic_start != _SMEM_DUAL_BOOTINFO_MAGIC_START_TRYMODE)))
 		return -ENOMSG;
 
 	return 0;
@@ -1162,10 +1164,40 @@ static void print_ubi_vol_info(void)
 }
 #endif
 
+int check_flash_exceed(struct smem_ptn *p, uint32_t offset, uint32_t psize) {
+
+	uint32_t fsize = 0;
+	qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
+	uint32_t flash_type = sfi->flash_type;
+
+	if(flash_type == SMEM_BOOT_SPI_FLASH)
+		 flash_type = part_which_flash(p) ?  SMEM_BOOT_QSPI_NAND_FLASH :
+							SMEM_BOOT_SPI_FLASH;
+
+	switch (flash_type) {
+	case SMEM_BOOT_SPI_FLASH:
+		fsize = get_spi_flash_size();
+		break;
+#ifdef CONFIG_CMD_NAND
+	case SMEM_BOOT_NAND_FLASH:
+	case SMEM_BOOT_QSPI_NAND_FLASH:
+		fsize = nand_info[CONFIG_QPIC_NAND_NAND_INFO_IDX].size;
+		break;
+#endif
+	default:
+		return -1;
+	}
+
+	if (offset + psize > fsize)
+		return -1;
+
+	return 0;
+}
+
 int do_smeminfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
-	int i;
+	int i,ret;
 	uint32_t bsize;
 #ifdef IPQ_UBI_VOL_WRITE_SUPPORT
 	ubi_set_rootfs_part();
@@ -1217,6 +1249,11 @@ int do_smeminfo(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		} else {
 			psize = ((loff_t)p->size) * bsize;
 		}
+
+		/* skip printing the partition that exceeds flash size */
+		ret = check_flash_exceed(p, ((loff_t)p->start) * bsize, psize);
+		if (ret)
+			continue;
 
 		printf("%3d: " smem_ptn_name_fmt " 0x%08x %#16llx %#16llx\n",
 		       i, p->name, p->attr, ((loff_t)p->start) * bsize, psize);

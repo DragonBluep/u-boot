@@ -26,7 +26,13 @@
 #define CONFIG_SYS_NO_FLASH
 #define CONFIG_IPQ_NO_RELOC
 
-#define CONFIG_SYS_NONCACHED_MEMORY     (1 << 20)
+#define CONFIG_CMD_AES
+#define CONFIG_CMD_AES_256
+#define CONFIG_IPQ_DERIVE_KEY
+
+#ifndef CONFIG_IPQ_TINY
+#define CONFIG_SYS_NONCACHED_MEMORY     	(1 << 20)
+#endif /* CONFIG_IPQ_TINY */
 
 #define CONFIG_SYS_VSNPRINTF
 
@@ -100,11 +106,21 @@
 #define GPIO_IN_OUT_ADDR(x)			(TLMM_BASE + 0x4 + (x)*0x1000)
 
 #define CONFIG_SYS_SDRAM_BASE			0x40000000
+#ifdef CONFIG_IPQ_TINY
+#ifdef CONFIG_IPQ_TINY2
+#define CONFIG_SYS_TEXT_BASE			0x4B050000
+#define CONFIG_QCA_SMEM_SIZE			0x30000
+#else
+#define CONFIG_SYS_TEXT_BASE			0x4A450000
+#endif
+#define CONFIG_SYS_LOAD_ADDR                    (CONFIG_SYS_SDRAM_BASE + (64 << 20))
+#define	CONFIG_IPQ_JFFS2_CLEANMARKER
+#else
 #define CONFIG_SYS_TEXT_BASE			0x4A400000
+#define CONFIG_SYS_LOAD_ADDR                    (CONFIG_SYS_SDRAM_BASE + (256 << 20))
+#endif
 #define CONFIG_SYS_SDRAM_SIZE			0x10000000
 #define CONFIG_MAX_RAM_BANK_SIZE		CONFIG_SYS_SDRAM_SIZE
-#define CONFIG_SYS_LOAD_ADDR			(CONFIG_SYS_SDRAM_BASE + (64 << 20))
-#define CONFIG_ROOTFS_LOAD_ADDR			(CONFIG_SYS_SDRAM_BASE + (16 << 20))
 
 #define QCA_KERNEL_START_ADDR			CONFIG_SYS_SDRAM_BASE
 #define QCA_DRAM_KERNEL_SIZE			CONFIG_SYS_SDRAM_SIZE
@@ -158,7 +174,11 @@ extern loff_t board_env_size;
 #define CONFIG_ENV_OFFSET			board_env_offset
 #define CONFIG_ENV_SIZE				CONFIG_ENV_SIZE_MAX
 #define CONFIG_ENV_RANGE			board_env_range
+#ifdef CONFIG_IPQ_TINY
+#define CONFIG_SYS_MALLOC_LEN			(832 << 10)
+#else
 #define CONFIG_SYS_MALLOC_LEN		(CONFIG_ENV_SIZE_MAX + (768 << 10))
+#endif
 
 #define CONFIG_IPQ_NO_MACS			2
 
@@ -206,24 +226,10 @@ extern loff_t board_env_size;
 
 #define NUM_ALT_PARTITION			16
 
-#ifdef CONFIG_IPQ_TINY
-
-/* undef gzip lib */
-#undef CONFIG_GZIP
-#undef CONFIG_ZLIB
-
-#else
-
 #define CONFIG_CMD_BOOTZ
 
 /* Mii command support */
 #define CONFIG_CMD_MII
-
-/* compress crash dump support */
-#define CONFIG_CMD_ZIP
-#define CONFIG_GZIP_COMPRESSED
-
-#endif
 
 /*
 * Ethernet Configs
@@ -259,11 +265,17 @@ extern loff_t board_env_size;
 #define CONFIG_QCA_SPI
 #define CONFIG_SPI_FLASH
 #define CONFIG_CMD_SF
+
+#ifndef CONFIG_IPQ_TINY_SPI_NOR
 #define CONFIG_SPI_FLASH_STMICRO
 #define CONFIG_SPI_FLASH_WINBOND
 #define CONFIG_SPI_FLASH_MACRONIX
 #define CONFIG_SPI_FLASH_GIGADEVICE
 #define CONFIG_SPI_FLASH_SPANSION
+#else /* Needed for manufacturer specific driver support, if any */
+#define CONFIG_SPI_FLASH_GIGADEVICE
+#endif
+
 #define CONFIG_SF_DEFAULT_BUS			0
 #define CONFIG_SF_DEFAULT_CS			0
 #define CONFIG_SF_DEFAULT_MODE			SPI_MODE_0
@@ -339,7 +351,6 @@ extern loff_t board_env_size;
 #define CONFIG_MMC_FORCE_CAP_4BIT_BUSWIDTH
 #endif
 
-#define CONFIG_IPQ_FDT_FIXUP
 #define CONFIG_FDT_FIXUP_PARTITIONS
 /*
  * PCIE Enable
@@ -349,6 +360,7 @@ extern loff_t board_env_size;
 #define CONFIG_PCI
 #define CONFIG_CMD_PCI
 #define CONFIG_PCI_SCAN_SHOW
+#define CONFIG_IPQ_PCI_INIT_DEFER
 #endif
 
 /*
@@ -434,9 +446,44 @@ extern loff_t board_env_size;
 #endif
 
 /*
+ * TINY NOR 16M Profile
+ */
+#ifdef CONFIG_IPQ_TINY_SPI_NOR
+#define CONFIG_CMD_DISABLE_BASE
+#define CONFIG_CMD_DISABLE_BOOTP
+#define CONFIG_CMD_DISABLE_CHPART
+#define CONFIG_CMD_DISABLE_FDT
+#define CONFIG_FIT_DISABLE_MD5
+#define CONFIG_FIT_DISABLE_SHA1
+#define CONFIG_FIT_DISABLE_SHA256
+#define CONFIG_DISABLE_CMD_SF_UPDATE
+#define CONFIG_DISABLE_CMD_SF_PROTECT
+#define CONFIG_DISABLE_CMD_SF_BULKERASE
+#define CONFIG_DISABLE_CMD_UART
+#define CONFIG_DISABLE_KERNEL64
+#define CONFIG_CMD_DISABLE_EXECTZT
+#define CONFIG_DISABLE_RAMDISK
+#define CONFIG_DISABLE_SIGNED_BOOT
+#undef CONFIG_GZIP
+#undef CONFIG_ZLIB
+#else
+#define CONFIG_IPQ_ELF_AUTH
+
+/* compress crash dump support */
+#define CONFIG_CMD_ZIP
+#define CONFIG_GZIP_COMPRESSED
+
+/* Enable DTB compress */
+#define CONFIG_COMPRESSED_DTB_MAX_SIZE		0x40000
+#define CONFIG_COMPRESSED_DTB_BASE		CONFIG_SYS_TEXT_BASE -\
+						CONFIG_COMPRESSED_DTB_MAX_SIZE
+#endif
+
+#define CONFIG_IPQ_FDT_FIXUP
+
+/*
  * ELF authentication
  */
-#define CONFIG_IPQ_ELF_AUTH
 #define CONFIG_VERSION_ROLLBACK_PARTITION_INFO
 
 #undef CONFIG_BOOTM_NETBSD
@@ -446,10 +493,6 @@ extern loff_t board_env_size;
 
 #define CONFIG_CMD_IPQ_FLASH_INIT
 
-/* Enable DTB compress */
-#define CONFIG_COMPRESSED_DTB_MAX_SIZE		0x40000
-#define CONFIG_COMPRESSED_DTB_BASE		CONFIG_SYS_TEXT_BASE -\
-						CONFIG_COMPRESSED_DTB_MAX_SIZE
 /* Flash Protect */
 #define CONFIG_FLASH_PROTECT
 
@@ -458,6 +501,13 @@ extern loff_t board_env_size;
 #define CONFIG_IPQ_QTI_BIT_BANGMII
 #define GPIO_IN_OUT_BIT			9
 #define CONFIG_BITBANGMII_MULTI
+#endif
+
+#define CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+
+#ifdef CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+#define CONFIG_NAME_MAX_ENTRIES	6
+#define CONFIG_NAME_MAX_LEN	32
 #endif
 
 #endif /* _IPQ5332_H */

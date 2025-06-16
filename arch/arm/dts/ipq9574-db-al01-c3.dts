@@ -15,7 +15,7 @@
 #include "ipq9574-db-al01-c1.dts"
 / {
 	machid = <0x1050200>;
-	config_name = "config@db-al01-c3";
+	config_name = "config@db-al01-c3", "config-db-al01-c3";
 
 	ess-switch {
 		/* Overriding port6 configuration to support AQ instead

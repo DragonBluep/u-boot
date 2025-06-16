@@ -299,6 +299,7 @@ const void *fdt_getprop(const void *fdt, int nodeoffset,
 	return fdt_getprop_namelen(fdt, nodeoffset, name, strlen(name), lenp);
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 uint32_t fdt_get_phandle(const void *fdt, int nodeoffset)
 {
 	const fdt32_t *php;
@@ -315,6 +316,7 @@ uint32_t fdt_get_phandle(const void *fdt, int nodeoffset)
 
 	return fdt32_to_cpu(*php);
 }
+#endif
 
 const char *fdt_get_alias_namelen(const void *fdt,
 				  const char *name, int namelen)
@@ -328,6 +330,7 @@ const char *fdt_get_alias_namelen(const void *fdt,
 	return fdt_getprop_namelen(fdt, aliasoffset, name, namelen, NULL);
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 const char *fdt_get_alias(const void *fdt, const char *name)
 {
 	return fdt_get_alias_namelen(fdt, name, strlen(name));
@@ -384,6 +387,7 @@ int fdt_get_path(const void *fdt, int nodeoffset, char *buf, int buflen)
 
 	return offset; /* error from fdt_next_node() */
 }
+#endif
 
 int fdt_supernode_atdepth_offset(const void *fdt, int nodeoffset,
 				 int supernodedepth, int *nodedepth)
@@ -442,6 +446,7 @@ int fdt_parent_offset(const void *fdt, int nodeoffset)
 					    nodedepth - 1, NULL);
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdt_node_offset_by_prop_value(const void *fdt, int startoffset,
 				  const char *propname,
 				  const void *propval, int proplen)
@@ -493,6 +498,7 @@ int fdt_node_offset_by_phandle(const void *fdt, uint32_t phandle)
 
 	return offset; /* error from fdt_next_node() */
 }
+#endif
 
 int fdt_stringlist_contains(const char *strlist, int listlen, const char *str)
 {
@@ -531,6 +537,7 @@ int fdt_count_strings(const void *fdt, int node, const char *property)
 	return count;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdt_find_string(const void *fdt, int node, const char *property,
 		    const char *string)
 {
@@ -556,6 +563,7 @@ int fdt_find_string(const void *fdt, int node, const char *property,
 
 	return -FDT_ERR_NOTFOUND;
 }
+#endif
 
 int fdt_get_string_index(const void *fdt, int node, const char *property,
 			 int index, const char **output)
@@ -581,11 +589,13 @@ int fdt_get_string_index(const void *fdt, int node, const char *property,
 	return -FDT_ERR_NOTFOUND;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdt_get_string(const void *fdt, int node, const char *property,
 		   const char **output)
 {
 	return fdt_get_string_index(fdt, node, property, 0, output);
 }
+#endif
 
 int fdt_node_check_compatible(const void *fdt, int nodeoffset,
 			      const char *compatible)

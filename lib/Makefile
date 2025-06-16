@@ -21,9 +21,11 @@ obj-$(CONFIG_CMD_DHRYSTONE) += dhry/
 
 obj-$(CONFIG_AES) += aes.o
 obj-$(CONFIG_USB_TTY) += circbuf.o
+ifndef CONFIG_REDUCE_FOOTPRINT
 obj-y += crc7.o
 obj-y += crc8.o
 obj-y += crc16.o
+endif
 obj-$(CONFIG_ERRNO_STR) += errno_str.o
 obj-$(CONFIG_FIT) += fdtdec_common.o
 obj-$(CONFIG_$(SPL_)OF_CONTROL) += fdtdec_common.o

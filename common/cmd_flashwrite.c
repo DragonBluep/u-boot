@@ -45,6 +45,7 @@ extern struct sdhci_host mmc_host;
 #define HEADER_VERSION 4
 
 #define SHA1_SIG_LEN 41
+#define SZ_1M 0x00100000
 
 struct header {
 	unsigned magic[2];
@@ -204,7 +205,7 @@ char * const argv[])
 	uint32_t offset, part_size, adj_size;
 	uint32_t load_addr = 0;
 	uint32_t file_size = 0;
-	uint32_t size_block, start_block, file_size_cpy;
+	uint32_t size_block, start_block, file_size_cpy = 0;
 	char *part_name = NULL, *filesize, *loadaddr;
 	int flash_type, ret;
 	unsigned int active_part = 0;
@@ -212,6 +213,12 @@ char * const argv[])
 #ifdef CONFIG_IPQ806X
 	char* layout_linux[] = {"rootfs", "0:BOOTCONFIG", "0:BOOTCONFIG1"};
 	int len, i;
+#endif
+
+#ifdef CONFIG_IPQ_JFFS2_CLEANMARKER
+	int cleanmarker[3] = {0x20031985 , 0xc, 0xe41eb0b1}, j;
+	char runcmd[256];
+	bool write_cleanmarker = 0;
 #endif
 	offset = 0;
 	part_size = 0;
@@ -401,6 +408,11 @@ char * const argv[])
 
 			offset = sfi->flash_block_size * start_block;
 			part_size = sfi->flash_block_size * size_block;
+
+#ifdef CONFIG_IPQ_JFFS2_CLEANMARKER
+			if (!strncmp(part_name, "rootfs", sizeof("rootfs")))
+				write_cleanmarker = 1;
+#endif
 		}
 	}
 
@@ -434,6 +446,30 @@ char * const argv[])
 
 		ret = write_to_flash(flash_type, load_addr, offset, part_size,
 							file_size, layout);
+#ifdef CONFIG_IPQ_JFFS2_CLEANMARKER
+		if (write_cleanmarker) {
+			file_size = ALIGN(file_size, sfi->flash_block_size);
+			if ( part_size - file_size < SZ_1M) {
+				printf("Skipping clean marker as space is less 0x%x \n",
+							part_size - file_size);
+				goto exit;
+			}
+
+			printf("Adding clean markers in rootfs_data\n");
+			setenv("stdout", "nulldev");
+			for (j = 0; j < part_size - file_size;
+					j +=  sfi->flash_block_size) {
+				snprintf(runcmd, sizeof(runcmd),
+				"sf write 0x%x 0x%x 0x%x && ",
+				(uint32_t)cleanmarker, offset + file_size + j,
+							sizeof(cleanmarker));
+				ret = run_command(runcmd, 0);
+				if (ret != CMD_RET_SUCCESS)
+					break;
+			}
+			setenv("stdout", "serial");
+		}
+#endif
 	} else
 		ret = fl_erase(flash_type, offset, part_size, layout);
 exit:

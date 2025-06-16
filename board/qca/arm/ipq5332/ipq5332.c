@@ -26,6 +26,16 @@
 #include <ipq5332.h>
 #include <spi.h>
 #include <spi_flash.h>
+
+#if defined(CONFIG_ART_COMPRESSED) &&   \
+        (defined(CONFIG_GZIP) || defined(CONFIG_LZMA))
+#ifndef CONFIG_COMPRESSED_LOAD_ADDR
+#define CONFIG_COMPRESSED_LOAD_ADDR CONFIG_SYS_LOAD_ADDR
+#endif
+#include <mapmem.h>
+#include <lzma/LzmaTools.h>
+#endif
+
 #ifdef CONFIG_QPIC_NAND
 #include <asm/arch-qca-common/qpic_nand.h>
 #include <nand.h>
@@ -51,6 +61,17 @@
 #define GCC_UNIPHY1_BCR			0x1816014
 
 DECLARE_GLOBAL_DATA_PTR;
+
+unsigned long fuse_addr[FUSE_CNT] = {
+		0x000A00D0,
+		0x000A00E8,
+		0x000A00F0,
+		0x000A00F8,
+		0x000A0100,
+		0x000A0108,
+		0x000A0110,
+		0x000A0118,
+};
 
 static int aq_phy_initialised = 0;
 extern int ipq5332_edma_init(void *cfg);
@@ -100,6 +121,7 @@ struct dumpinfo_t dumpinfo_n[] = {
 	{ "EBICS0.BIN", 0x40000000, CONFIG_QCA_UBOOT_OFFSET, 0, 0, 0, 0, 1 },
 #endif
 	{ "IMEM.BIN", 0x08600000, 0x00001000, 0 },
+	{ "IMEM2.BIN", 0x860F000, 0x00001000, 0 },
 	{ "UNAME.BIN", 0, 0, 0, 0, 0, MINIMAL_DUMP },
 	{ "CPU_INFO.BIN", 0, 0, 0, 0, 0, MINIMAL_DUMP },
 	{ "DMESG.BIN", 0, 0, 0, 0, 0, MINIMAL_DUMP },
@@ -108,6 +130,7 @@ struct dumpinfo_t dumpinfo_n[] = {
 };
 int dump_entries_n = ARRAY_SIZE(dumpinfo_n);
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_flash(void *blob)
 {
 	uint32_t flash_type = SMEM_BOOT_NO_FLASH;
@@ -127,6 +150,20 @@ void fdt_fixup_flash(void *blob)
 	}
 	return;
 }
+#endif
+
+#ifdef CONFIG_IPQ_TINY_SPI_NOR
+void fdt_fixup_art_format(void *blob)
+{
+	int nodeoffset;
+	int ret;
+
+	nodeoffset = fdt_path_offset(blob, "/");
+	ret = fdt_setprop(blob, nodeoffset, "compressed_art", NULL, 0);
+	if (ret != 0)
+		printf("fdt-fixup: unable to set property 'compressed_art'\n");
+}
+#endif
 
 void qca_serial_init(struct ipq_serial_platdata *plat)
 {
@@ -712,10 +749,10 @@ static void usb_init_hsphy(void __iomem *phybase, int ssphy)
 	writel(XCFG_COARSE_TUNE_NUM | XCFG_FINE_TUNE_NUM,
 		phybase + USB2PHY_USB_PHY_M31_XCFGI_11);
 
-	/* Adjust HSTX slew rate to 565 ps*/
+	/* Adjust HSTX slew rate to 400 ps*/
 	/* Adjust PLL lock Time counter for release clock to 35uA */
 	/* Adjust Manual control ODT value to 38.02 Ohm */
-	writel(HSTX_SLEW_RATE_565PS | PLL_CHARGING_PUMP_CURRENT_35UA |
+	writel(HSTX_SLEW_RATE_400PS | PLL_CHARGING_PUMP_CURRENT_35UA |
 		ODT_VALUE_38_02_OHM, phybase + USB2PHY_USB_PHY_M31_XCFGI_4);
 
 	/*
@@ -724,10 +761,17 @@ static void usb_init_hsphy(void __iomem *phybase, int ssphy)
 	*/
 	writel(USB2_0_TX_ENABLE, phybase + USB2PHY_USB_PHY_M31_XCFGI_1);
 
-	/* Adjust Manual control ODT value to 45.02 Ohm */
 	/* Adjust HSTX Pre-emphasis level to 0.55mA */
-	writel(ODT_VALUE_45_02_OHM | HSTX_PRE_EMPHASIS_LEVEL_0_55MA,
+	writel(HSTX_PRE_EMPHASIS_LEVEL_0_55MA,
 		phybase + USB2PHY_USB_PHY_M31_XCFGI_5);
+
+	/*
+	* Adjust HSTX Current of current-mode driver,
+	* default 18.5mA * 22.5ohm = 416mV
+	* 17.1mA * 22.5ohm = 385mV
+	*/
+	writel(HSTX_CURRENT_17_1MA_385MV,
+		phybase + USB2PHY_USB_PHY_M31_XCFGI_9);
 
 	udelay(10);
 
@@ -811,6 +855,76 @@ int ipq_board_usb_init(void)
 }
 #endif
 
+unsigned int get_dts_machid(unsigned int machid)
+{
+	switch (machid)
+	{
+		case MACH_TYPE_IPQ5332_AP_MI01_2_C2:
+			return MACH_TYPE_IPQ5332_AP_MI01_2;
+		case MACH_TYPE_IPQ5332_AP_MI01_3_C2:
+			return MACH_TYPE_IPQ5332_AP_MI01_3;
+		case MACH_TYPE_IPQ5332_AP_MI01_3_C3:
+			return MACH_TYPE_IPQ5332_AP_MI01_3;
+		case MACH_TYPE_IPQ5332_AP_MI01_7:
+			return MACH_TYPE_IPQ5332_AP_MI01_13;
+		case MACH_TYPE_IPQ5332_AP_MI01_14:
+			return MACH_TYPE_IPQ5332_AP_MI01_12;
+		case MACH_TYPE_IPQ5332_AP_MI04_1_C2:
+			return MACH_TYPE_IPQ5332_AP_MI04_1;
+		default:
+			return machid;
+	}
+}
+
+void ipq_uboot_fdt_fixup(void)
+{
+	init_config_list();
+	switch (gd->bd->bi_arch_number)
+	{
+		case MACH_TYPE_IPQ5332_AP_MI01_2_C2:
+			add_config_entry("config@mi01.2-c2");
+			add_config_entry("config-mi01.2-c2");
+			add_config_entry("config@rdp484");
+			add_config_entry("config-rdp484");
+			break;
+		case MACH_TYPE_IPQ5332_AP_MI01_3_C2:
+			add_config_entry("config@mi01.3-c2");
+			add_config_entry("config-mi01.3-c2");
+			add_config_entry("config@rdp477");
+			add_config_entry("config-rdp477");
+			break;
+		case MACH_TYPE_IPQ5332_AP_MI01_3_C3:
+			add_config_entry("config@mi01.3-c3");
+			add_config_entry("config-mi01.3-c3");
+			add_config_entry("config@rdp486");
+			add_config_entry("config-rdp486");
+			break;
+		case MACH_TYPE_IPQ5332_AP_MI01_7:
+			add_config_entry("config@mi01.7");
+			add_config_entry("config-mi01.7");
+			add_config_entry("config@rdp473");
+			add_config_entry("config-rdp473");
+			break;
+		case MACH_TYPE_IPQ5332_AP_MI04_1_C2:
+			add_config_entry("config@mi04.1-c2");
+			add_config_entry("config-mi04.1-c2");
+			add_config_entry("config@rdp478");
+			add_config_entry("config-rdp478");
+			add_config_entry("config@1");
+			add_config_entry("config-1");
+			break;
+		case MACH_TYPE_IPQ5332_AP_MI01_14:
+			add_config_entry("config@mi01.14");
+			add_config_entry("config-mi01.14");
+			add_config_entry("config@rdp481");
+			add_config_entry("config-rdp481");
+			break;
+		default:
+			add_config_list_from_fdt();
+	}
+	return;
+}
+
 __weak int ipq_get_tz_version(char *version_name, int buf_size)
 {
 	return 1;
@@ -818,8 +932,39 @@ __weak int ipq_get_tz_version(char *version_name, int buf_size)
 
 int ipq_read_tcsr_boot_misc(void)
 {
-	u32 *dmagic = TCSR_BOOT_MISC_REG;
-	return *dmagic;
+	u32 dmagic;
+	int ret;
+	long feat_avail;
+	qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
+
+	/* In recovery path, we dont have TZ. So, skipping
+	 * dload magic read
+	 */
+	if (sfi->flash_type == SMEM_BOOT_NO_FLASH)
+		return 0;
+
+	/* The TCSR dload register is protected in latest TZ.
+	 * Old TZ will allow direct read.
+	 * Use the qca_scm_is_feature_available() call to know
+	 * if TZ supports direct or scm read. Based on return
+	 * value, read the TCSR dload register appropriately.
+	 */
+	feat_avail = qca_scm_is_feature_available(0x6);
+	if (feat_avail == 0x401000) {
+		if (is_scm_armv8()) {
+			ret = qca_scm_call_read(SCM_SVC_IO, SCM_IO_READ,
+					TCSR_BOOT_MISC_REG, &dmagic);
+			if (ret)
+				return 0;
+		}
+		else
+			return 0;
+	}
+	else {
+		dmagic = *(TCSR_BOOT_MISC_REG);
+	}
+
+	return dmagic;
 }
 
 int apps_iscrashed_crashdump_disabled(void)
@@ -914,6 +1059,7 @@ void board_nand_init(void)
 	gpio_node = fdt_path_offset(gd->fdt_blob, "/spi/spi_gpio");
 	if (gpio_node >= 0) {
 		qca_gpio_init(gpio_node);
+		spi_clock_init(0);
 #ifdef CONFIG_MTD_DEVICE
 		ipq_spi_init(CONFIG_IPQ_SPI_NOR_INFO_IDX);
 #endif
@@ -1073,10 +1219,11 @@ void aquantia_phy_reset_init_done(void)
 
 	aquantia_gpio_cnt = get_aquantia_gpio(aquantia_gpio);
 	if (aquantia_gpio_cnt >= 1) {
-		for (i = 0; i < aquantia_gpio_cnt; i++)
+		for (i = 0; i < aquantia_gpio_cnt; i++) {
 			gpio_set_value(aquantia_gpio[i], 0x1);
 			writel(0x3, GPIO_IN_OUT_ADDR(aquantia_gpio[i]));
 			mdelay(500);
+		}
 	}
 }
 

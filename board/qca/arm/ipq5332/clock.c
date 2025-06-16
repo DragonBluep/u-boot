@@ -17,6 +17,9 @@
 #include <asm/arch-ipq5332/clk.h>
 #include <asm/io.h>
 #include <asm/errno.h>
+#include <fdtdec.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 static void uart_configure_mux(u8 id)
 {
@@ -509,6 +512,7 @@ void cfg_clock_init(void)
 void mdio_clock_init(void)
 {
 	unsigned int reg_val;
+	int node = fdt_path_offset(gd->fdt_blob, "/ess-switch");
 
 	/* MDIO Master Clock init */
 	reg_val = readl(GCC_MDIO_MASTER_AHB_CBCR);
@@ -519,10 +523,12 @@ void mdio_clock_init(void)
 	reg_val |= BIT(0);
 	writel(reg_val, MDIO_50MHZ_CLK_BASE);
 
-	reg_val = readl(MDIO_50MHZ_CLK_BASE + 0x10000);
-	reg_val |= BIT(0);
-	writel(reg_val, MDIO_50MHZ_CLK_BASE + 0x10000);
-
+	if (!(fdtdec_get_uint(gd->fdt_blob, node,
+		"qca8084_bypass_enable", 0))) {
+		reg_val = readl(MDIO_50MHZ_CLK_BASE + 0x10000);
+		reg_val |= BIT(0);
+		writel(reg_val, MDIO_50MHZ_CLK_BASE + 0x10000);
+	}
 }
 
 
@@ -536,10 +542,6 @@ void noc_clock_init(void)
 
 	reg_val = readl(GCC_NSSNOC_SNOC_1_CBCR);
 	writel(reg_val | GCC_CBCR_CLK_ENABLE, GCC_NSSNOC_SNOC_1_CBCR);
-
-	reg_val = readl(GCC_MEM_NOC_SNOC_AXI_CBCR);
-	writel(reg_val | GCC_CBCR_CLK_ENABLE, GCC_MEM_NOC_SNOC_AXI_CBCR);
-
 }
 
 void uniphy_clock_enable(enum uniphy_clk_type clk_type, bool enable)

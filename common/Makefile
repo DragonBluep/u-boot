@@ -98,7 +98,10 @@ obj-$(CONFIG_CMD_EXT4) += cmd_ext4.o
 obj-$(CONFIG_CMD_EXT2) += cmd_ext2.o
 obj-$(CONFIG_CMD_FAT) += cmd_fat.o
 obj-$(CONFIG_CMD_FDC) += cmd_fdc.o
-obj-$(CONFIG_OF_LIBFDT) += cmd_fdt.o fdt_support.o
+ifndef CONFIG_CMD_DISABLE_FDT
+obj-y += cmd_fdt.o
+endif
+obj-$(CONFIG_OF_LIBFDT) += fdt_support.o
 obj-$(CONFIG_CMD_FITUPD) += cmd_fitupd.o
 obj-$(CONFIG_CMD_FLASH) += cmd_flash.o
 obj-$(CONFIG_CMD_FLASHWRITE) += cmd_flashwrite.o
@@ -296,7 +299,9 @@ obj-y += cli.o
 obj-y += cli_readline.o
 obj-y += command.o
 obj-y += s_record.o
+ifndef CONFIG_REDUCE_FOOTPRINT
 obj-y += xyzModem.o
+endif
 obj-y += cmd_disk.o
 
 CFLAGS_env_embedded.o := -Wa,--no-warn -DENV_CRC=$(shell tools/envcrc 2>/dev/null)

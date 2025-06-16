@@ -13,6 +13,7 @@
 
 #include <common.h>
 #include <command.h>
+#include <bootm.h>
 #include <image.h>
 #include <nand.h>
 #include <errno.h>
@@ -50,6 +51,7 @@ static qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
 int ipq_fs_on_nand ;
 extern int nand_env_device;
 extern qca_mmc mmc_host;
+extern void set_minidump_bootargs(void);
 
 #ifdef CONFIG_QCA_MMC
 static qca_mmc *host = &mmc_host;
@@ -85,6 +87,24 @@ typedef struct {
 } image_info;
 #endif
 
+extern bootm_headers_t images;		/* pointers to os/initrd/fdt images */
+#ifdef CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+extern struct config_list config_entries;
+#endif
+
+static int boot_os(int argc, char *const argv[])
+{
+
+	return do_bootm_states(NULL, 0, argc, argv, BOOTM_STATE_START |
+		BOOTM_STATE_FINDOS | BOOTM_STATE_FINDOTHER |
+		BOOTM_STATE_LOADOS |
+#if defined(CONFIG_PPC) || defined(CONFIG_MIPS)
+		BOOTM_STATE_OS_CMDLINE |
+#endif
+		BOOTM_STATE_OS_PREP | BOOTM_STATE_OS_FAKE_GO |
+		BOOTM_STATE_OS_GO, &images, 1);
+}
+
 void __stack_chk_fail(void)
 {
 	printf("stack-protector: U-boot stack is corrupted.\n");
@@ -93,7 +113,7 @@ void __stack_chk_fail(void)
 
 static int update_bootargs(void *addr)
 {
-	char *fit_bootargs, *strings = getenv("bootargs");
+	char *fit_bootargs, *strings;
 	int len, ret = CMD_RET_SUCCESS;
 	char * cmd_line = malloc(CONFIG_SYS_CBSIZE);
 	if (!cmd_line) {
@@ -101,20 +121,32 @@ static int update_bootargs(void *addr)
 		return CMD_RET_FAILURE;
 	}
 
+#ifdef CONFIG_QCA_APPSBL_DLOAD
+	if (getenv("dump_to_nvmem"))
+		set_minidump_bootargs();
+#endif
+
+       	strings = getenv("bootargs");
 	memset(cmd_line, 0, CONFIG_SYS_CBSIZE);
 	fit_bootargs = (char *)fdt_getprop(addr, 0, FIT_BOOTARGS_PROP, &len);
 	if ((fit_bootargs != NULL) && len) {
-		if ((strlen(strings) + len) > CONFIG_SYS_CBSIZE) {
+		if (strings && ((strlen(strings) + len) > CONFIG_SYS_CBSIZE)) {
 			ret = CMD_RET_FAILURE;
 		} else {
-			memcpy(cmd_line, strings, strlen(strings));
-			snprintf(cmd_line + strlen(strings), CONFIG_SYS_CBSIZE,
+			if(strings)
+				memcpy(cmd_line, strings, strlen(strings));
+
+			snprintf(cmd_line + (strings? strlen(strings) : 0),
+					CONFIG_SYS_CBSIZE,
 					" %s rootwait", fit_bootargs);
 		}
 	} else {
-		memcpy(cmd_line, strings, strlen(strings));
-		len = snprintf(cmd_line + strlen(strings), CONFIG_SYS_CBSIZE,
-			" %s rootwait", getenv("fsbootargs"));
+		if(strings)
+			memcpy(cmd_line, strings, strlen(strings));
+
+		len = snprintf(cmd_line + (strings? strlen(strings) : 0),
+				CONFIG_SYS_CBSIZE,
+				" %s rootwait", getenv("fsbootargs"));
 		if (len >= CONFIG_SYS_CBSIZE)
 			ret = CMD_RET_FAILURE;
 	}
@@ -263,12 +295,17 @@ int config_select(unsigned int addr, char *rcmd, int rcmd_size)
 			ret = update_bootargs((void *)addr);
 			if (ret)
 				goto fail;
-			snprintf(rcmd, rcmd_size, "bootm 0x%x#%s\n",
+			snprintf(rcmd, rcmd_size, "0x%x#%s",
 				 addr, dtb_config_name);
 			return 0;
 		}
 	} else {
-		strings_count = fdt_count_strings(gd->fdt_blob, 0, "config_name");
+#ifdef CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+		strings_count = config_entries.no_of_entries;
+#else
+		strings_count = fdt_count_strings(gd->fdt_blob, 0,
+							"config_name");
+#endif
 
 		if (!strings_count) {
 			printf("Failed to get config_name\n");
@@ -276,9 +313,12 @@ int config_select(unsigned int addr, char *rcmd, int rcmd_size)
 		}
 
 		for (i = 0; i < strings_count; i++) {
+#ifdef CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+			config = config_entries.entry[i];
+#else
 			fdt_get_string_index(gd->fdt_blob, 0, "config_name",
 					   i, &config);
-
+#endif
 			snprintf((char *)dtb_config_name,
 				 sizeof(dtb_config_name), "%s", config);
 
@@ -296,7 +336,7 @@ int config_select(unsigned int addr, char *rcmd, int rcmd_size)
 				ret = update_bootargs((void *)addr);
 				if (ret)
 					goto fail;
-				snprintf(rcmd, rcmd_size, "bootm 0x%x#%s\n",
+				snprintf(rcmd, rcmd_size, "0x%x#%s",
 					 addr, dtb_config_name);
 				return 0;
 			}
@@ -350,6 +390,7 @@ static int parse_elf_image_phdr(image_info *img_info, unsigned int addr)
 }
 #endif
 
+#ifndef CONFIG_DISABLE_SIGNED_BOOT
 static int copy_rootfs(unsigned int request, uint32_t size)
 {
 	char runcmd[256];
@@ -469,20 +510,17 @@ static int authenticate_rootfs_elf(unsigned int rootfs_hdr)
 		unsigned long addr;
 	} rootfs_img_info;
 
-	request = CONFIG_ROOTFS_LOAD_ADDR;
-	rootfs_img_info.addr = request;
-	rootfs_img_info.type = SEC_AUTH_SW_ID;
-
 	if (parse_elf_image_phdr(&img_info, rootfs_hdr))
 		return CMD_RET_FAILURE;
 
+	request = img_info.img_load_addr;
 	memcpy((void*)request, (void*)rootfs_hdr, img_info.img_offset);
 
-	request += img_info.img_offset;
-
 	/* copy rootfs from the boot device */
-	copy_rootfs(request, img_info.img_size);
+	copy_rootfs(request + img_info.img_offset, img_info.img_size);
 
+	rootfs_img_info.addr = request;
+	rootfs_img_info.type = SEC_AUTH_SW_ID;
 	rootfs_img_info.size = img_info.img_offset + img_info.img_size;
 	ret = qca_scm_secure_authenticate(&rootfs_img_info, sizeof(rootfs_img_info));
 	memset((void *)rootfs_hdr, 0, img_info.img_offset);
@@ -496,6 +534,7 @@ static int authenticate_rootfs_elf(unsigned int rootfs_hdr)
 static int do_boot_signedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	char runcmd[256];
+	char * const arg[1] = {runcmd};
 	int ret;
 	unsigned int request;
 #ifdef CONFIG_VERSION_ROLLBACK_PARTITION_INFO
@@ -724,6 +763,12 @@ static int do_boot_signedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const a
 		}
 #endif
 	}
+
+#ifdef CONFIG_SKIP_RESET
+	if (apps_iscrashed())
+		return 1;
+#endif
+
 	/*
 	* This sys call will switch the CE1 channel to ADM usage
 	* so that HLOS can use it.
@@ -740,7 +785,7 @@ static int do_boot_signedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const a
 	if (debug)
 		printf("%s", runcmd);
 
-	if (ret < 0 || run_command(runcmd, 0) != CMD_RET_SUCCESS) {
+	if (ret < 0 || boot_os(1, arg) != CMD_RET_SUCCESS) {
 #ifdef CONFIG_QCA_MMC
 		mmc_initialize(gd->bd);
 #endif
@@ -756,11 +801,13 @@ static int do_boot_signedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const a
 #endif
 	return CMD_RET_SUCCESS;
 }
+#endif
 
 static int do_boot_unsignedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret;
 	char runcmd[256];
+	char * const arg[1] = {runcmd};
 #ifdef CONFIG_QCA_MMC
 	block_dev_desc_t *blk_dev;
 	disk_partition_t disk_info;
@@ -879,7 +926,7 @@ static int do_boot_unsignedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const
 				    runcmd, sizeof(runcmd));
 	} else if (ret == IMAGE_FORMAT_LEGACY) {
 		snprintf(runcmd, sizeof(runcmd),
-			 "bootm 0x%x\n", CONFIG_SYS_LOAD_ADDR);
+			 "0x%x", CONFIG_SYS_LOAD_ADDR);
 	} else {
 		ret = genimg_get_format((void *)CONFIG_SYS_LOAD_ADDR +
 					sizeof(mbn_header_t));
@@ -896,16 +943,21 @@ static int do_boot_unsignedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const
 #endif
 		} else if (ret == IMAGE_FORMAT_LEGACY) {
 			snprintf(runcmd, sizeof(runcmd),
-				 "bootm 0x%x\n", (CONFIG_SYS_LOAD_ADDR +
+				 "0x%x", (CONFIG_SYS_LOAD_ADDR +
 						  sizeof(mbn_header_t)));
+
 		} else {
 			dcache_disable();
 			return CMD_RET_FAILURE;
 		}
 	}
 
+#ifdef CONFIG_SKIP_RESET
+	if (apps_iscrashed())
+		return 1;
+#endif
 
-	if (ret < 0 || run_command(runcmd, 0) != CMD_RET_SUCCESS) {
+	if (ret < 0 || boot_os(1, arg) != CMD_RET_SUCCESS) {
 #ifdef CONFIG_USB_XHCI_IPQ
 		ipq_board_usb_init();
 #endif
@@ -921,7 +973,9 @@ static int do_boot_unsignedimg(cmd_tbl_t *cmdtp, int flag, int argc, char *const
 static int do_bootipq(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	int ret;
+#ifndef CONFIG_DISABLE_SIGNED_BOOT
 	char buf = 0;
+#endif
 	/*
 	 * set fdt_high parameter so that u-boot will not load
 	 * dtb above CONFIG_IPQ40XX_FDT_HIGH region.
@@ -931,18 +985,22 @@ static int do_bootipq(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		return CMD_RET_FAILURE;
 	}
 
-	ret = qca_scm_call(SCM_SVC_FUSE, QFPROM_IS_AUTHENTICATE_CMD, &buf, sizeof(char));
-
 #if defined(CONFIG_IPQ9574_EDMA) || defined(CONFIG_IPQ5332_EDMA)
 	aquantia_phy_reset_init_done();
 #endif
+
+#ifndef CONFIG_DISABLE_SIGNED_BOOT
+	ret = qca_scm_call(SCM_SVC_FUSE, QFPROM_IS_AUTHENTICATE_CMD, &buf, sizeof(char));
+
 	/*
 	|| if atf is enable in env ,do_boot_signedimg is skip.
 	|| Note: This features currently support in ipq50XX.
 	*/
 	if (ret == 0 && buf == 1 && !is_atf_enabled()) {
 		ret = do_boot_signedimg(cmdtp, flag, argc, argv);
-	} else if (ret == 0 || ret == -EOPNOTSUPP) {
+	} else if (ret == 0 || ret == -EOPNOTSUPP)
+#endif
+	{
 		ret = do_boot_unsignedimg(cmdtp, flag, argc, argv);
 	}
 

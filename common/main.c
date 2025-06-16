@@ -20,6 +20,7 @@ DECLARE_GLOBAL_DATA_PTR;
  */
 __weak void show_boot_progress(int val) {}
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 static void modem_init(void)
 {
 #ifdef CONFIG_MODEM_SUPPORT
@@ -52,11 +53,12 @@ static void run_preboot_environment_command(void)
 	}
 #endif /* CONFIG_PREBOOT */
 }
+#endif
 
 /* We come here after U-Boot is initialised and ready to process commands */
 void main_loop(void)
 {
-	const char *s;
+	const char *s = NULL;
 
 	bootstage_mark_name(BOOTSTAGE_ID_MAIN_LOOP, "main_loop");
 
@@ -66,22 +68,28 @@ void main_loop(void)
 	puts("upgraded by the late 2014 may break or be removed.\n");
 #endif
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	modem_init();
 #ifdef CONFIG_VERSION_VARIABLE
 	setenv("ver", version_string);  /* set version variable */
 #endif /* CONFIG_VERSION_VARIABLE */
+#endif
 
 	cli_init();
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	run_preboot_environment_command();
+#endif
 
 #if defined(CONFIG_UPDATE_TFTP)
 	update_tftp(0UL, NULL, NULL);
 #endif /* CONFIG_UPDATE_TFTP */
 
 	s = bootdelay_process();
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	if (cli_process_fdt(&s))
 		cli_secure_boot_cmd(s);
+#endif
 
 	autoboot_command(s);
 

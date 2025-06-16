@@ -17,10 +17,11 @@
 #include "ipq5332-soc.dtsi"
 / {
 	machid = <0x8060004>;
-	config_name = "config@mi04.1";
+	config_name = "config@mi04.1", "config-mi04.1", "config@rdp446", "config-rdp446";
 
 	aliases {
 		console = "/serial@78AF000";
+		mmc = "/sdhci@7804000";
 		nand = "/nand-controller@79B0000";
 		usb0 = "/xhci@8a00000";
 		i2c0 = "/i2c@78B6000";

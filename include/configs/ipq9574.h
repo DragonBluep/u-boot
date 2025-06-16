@@ -22,6 +22,7 @@
 
 #define CONFIG_CMD_AES
 #define CONFIG_CMD_AES_256
+#define CONFIG_IPQ_DERIVE_KEY
 
 #define CONFIG_BOARD_EARLY_INIT_F
 #define CONFIG_BOARD_LATE_INIT
@@ -88,7 +89,6 @@
 #define CONFIG_SYS_SDRAM_SIZE		0x10000000
 #define CONFIG_MAX_RAM_BANK_SIZE	CONFIG_SYS_SDRAM_SIZE
 #define CONFIG_SYS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + (256 << 20))
-#define CONFIG_ROOTFS_LOAD_ADDR		(CONFIG_SYS_SDRAM_BASE + (32 << 20))
 
 #define QCA_KERNEL_START_ADDR		CONFIG_SYS_SDRAM_BASE
 #define QCA_DRAM_KERNEL_SIZE		CONFIG_SYS_SDRAM_SIZE
@@ -185,6 +185,7 @@ extern loff_t board_env_size;
 #define CONFIG_PCI
 #define CONFIG_CMD_PCI
 #define CONFIG_PCI_SCAN_SHOW
+#define CONFIG_IPQ_PCI_INIT_DEFER
 #endif
 
 /*
@@ -394,6 +395,10 @@ extern loff_t board_env_size;
 #define CONFIG_ARMV7_PSCI
 #define CONFIG_VERSION_ROLLBACK_PARTITION_INFO
 
+/* compress crash dump support */
+#define CONFIG_CMD_ZIP
+#define CONFIG_GZIP_COMPRESSED
+
 /*
  * Undefine configs not needed
  */
@@ -409,4 +414,10 @@ extern loff_t board_env_size;
 #define CONFIG_BITBANGMII_MULTI
 #endif
 
+#define CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+
+#ifdef CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+#define CONFIG_NAME_MAX_ENTRIES	4
+#define CONFIG_NAME_MAX_LEN	32
+#endif
 #endif /* _IPQ9574_H */

@@ -63,6 +63,7 @@ static int sf_parse_len_arg(char *arg, ulong *len)
 	return 1;
 }
 
+#ifndef CONFIG_DISABLE_CMD_SF_UPDATE
 /**
  * This function takes a byte length and a delta unit of time to compute the
  * approximate bytes per second
@@ -79,6 +80,7 @@ static ulong bytes_per_second(unsigned int len, ulong start_ms)
 	else
 		return 1024 * len / max(get_timer(start_ms), 1UL);
 }
+#endif
 
 static int do_spi_flash_probe(int argc, char * const argv[])
 {
@@ -153,6 +155,7 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 	return 0;
 }
 
+#ifndef CONFIG_DISABLE_CMD_SF_UPDATE
 /**
  * Write a block of data to SPI flash, first checking if it is different from
  * what is already there.
@@ -258,6 +261,7 @@ static int spi_flash_update(struct spi_flash *flash, u32 offset,
 
 	return 0;
 }
+#endif
 
 static int do_spi_flash_read_write(int argc, char * const argv[])
 {
@@ -303,9 +307,12 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 		return 1;
 	}
 
+#ifndef CONFIG_DISABLE_CMD_SF_UPDATE
 	if (strcmp(argv[0], "update") == 0) {
 		ret = spi_flash_update(flash, offset, len, buf);
-	} else if (strncmp(argv[0], "read", 4) == 0 ||
+	}
+#endif
+	if (strncmp(argv[0], "read", 4) == 0 ||
 			strncmp(argv[0], "write", 5) == 0) {
 		int read;
 
@@ -360,6 +367,7 @@ static int do_spi_flash_erase(int argc, char * const argv[])
 	return ret == 0 ? 0 : 1;
 }
 
+#ifndef CONFIG_DISABLE_CMD_SF_BULKERASE
 static int do_spi_flash_berase(int argc, char * const argv[])
 {
 	switch (spi_flash_berase(flash)) {
@@ -375,7 +383,9 @@ static int do_spi_flash_berase(int argc, char * const argv[])
 
 	return 1;
 }
+#endif
 
+#ifndef CONFIG_DISABLE_CMD_SF_PROTECT
 static int do_spi_protect(int argc, char * const argv[])
 {
 	int ret = 0;
@@ -406,6 +416,7 @@ static int do_spi_protect(int argc, char * const argv[])
 
 	return ret == 0 ? 0 : 1;
 }
+#endif
 
 #ifdef CONFIG_CMD_SF_TEST
 enum {
@@ -594,19 +605,26 @@ static int do_spi_flash(cmd_tbl_t *cmdtp, int flag, int argc,
 		return 1;
 	}
 
-	if (strcmp(cmd, "read") == 0 || strcmp(cmd, "write") == 0 ||
-	    strcmp(cmd, "update") == 0)
+	if (strcmp(cmd, "read") == 0 || strcmp(cmd, "write") == 0
+#ifndef CONFIG_DISABLE_CMD_SF_UPDATE
+	    || strcmp(cmd, "update") == 0
+#endif
+	   )
 		ret = do_spi_flash_read_write(argc, argv);
 	else if (strcmp(cmd, "erase") == 0)
 		ret = do_spi_flash_erase(argc, argv);
+#ifndef CONFIG_DISABLE_CMD_SF_PROTECT
 	else if (strcmp(cmd, "protect") == 0)
 		ret = do_spi_protect(argc, argv);
+#endif
 #ifdef CONFIG_CMD_SF_TEST
 	else if (!strcmp(cmd, "test"))
 		ret = do_spi_flash_test(argc, argv);
 #endif
+#ifndef CONFIG_DISABLE_CMD_SF_BULKERASE
 	else if (strcmp(cmd, "bulkerase") == 0)
 		ret = do_spi_flash_berase(argc, argv);
+#endif
 	else
 		ret = -1;
 
@@ -639,12 +657,18 @@ U_BOOT_CMD(
 	"sf erase offset|partition [+]len	- erase `len' bytes from `offset'\n"
 	"					  or from start of mtd `partition'\n"
 	"					 `+len' round up `len' to block size\n"
+#ifndef CONFIG_DISABLE_CMD_SF_UPDATE
 	"sf update addr offset|partition len	- erase and write `len' bytes from memory\n"
 	"					  at `addr' to flash at `offset'\n"
 	"					  or to start of mtd `partition'\n"
+#endif
+#ifndef CONFIG_DISABLE_CMD_SF_PROTECT
 	"sf protect lock/unlock sector len	- protect/unprotect 'len' bytes starting\n"
 	"					  at address 'sector'\n"
+#endif
+#ifndef CONFIG_DISABLE_CMD_SF_BULKERASE
 	"sf bulkerase				- Erase entire flash chip\n"
 	"						(Not supported on all devices)\n"
+#endif
 	SF_TEST_HELP
 );

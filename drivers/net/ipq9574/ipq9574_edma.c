@@ -2190,6 +2190,7 @@ int ipq9574_edma_init(void *edma_board_cfg)
 				case AQUANTIA_PHY_113C_A1:
 				case AQUANTIA_PHY_113C_B0:
 				case AQUANTIA_PHY_113C_B1:
+				case MARVELL_PHY_X3410:
 					ipq_board_fw_download(phy_addr);
 					mdelay(100);
 					ipq_qca_aquantia_phy_init(&ipq9574_edma_dev[i]->ops[phy_id], phy_addr);
@@ -2274,4 +2275,19 @@ init_failed:
 	}
 
 	return -1;
+}
+
+void ipq_eth_cleanup(struct eth_device *dev)
+{
+	struct ipq9574_eth_dev *priv = dev->priv;
+	struct ipq9574_edma_common_info *c_info = priv->c_info;
+	struct ipq9574_edma_hw *ehw = &c_info->hw;
+
+	ipq9574_edma_disable_intr(ehw);
+
+	ipq9574_edma_disable_rings(ehw);
+
+	ipq9574_edma_reg_write(IPQ9574_EDMA_REG_PORT_CTRL, 0);
+
+	return;
 }

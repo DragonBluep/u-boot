@@ -24,7 +24,9 @@
 #include <phy.h>
 #include <net.h>
 #include <miiphy.h>
+#include <memalign.h>
 #include <asm/arch-ipq5332/edma_regs.h>
+#include <asm/arch-qca-common/smem.h>
 #include <asm/global_data.h>
 #include <fdtdec.h>
 #include "ipq5332_edma.h"
@@ -45,6 +47,11 @@ DECLARE_GLOBAL_DATA_PTR;
 #define IPQ5332_EDMA_MAC_PORT_NO	3
 #endif
 
+#ifndef CONFIG_SYS_NONCACHED_MEMORY
+#define noncached_alloc(a, b) malloc_cache_aligned(a)
+#endif
+
+qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
 static struct ipq5332_eth_dev *ipq5332_edma_dev[IPQ5332_EDMA_DEV];
 typedef struct {
 	phy_info_t *phy_info;
@@ -919,6 +926,11 @@ static int ipq5332_eth_init(struct eth_device *eth_dev, bd_t *this)
 	int sgmii_mode = EPORT_WRAPPER_SGMII0_RGMII4, sfp_mode = -1;
 	char *active_port = NULL;
 
+#ifndef CONFIG_SYS_NONCACHED_MEMORY
+	if(sfi->flash_type)
+		dcache_disable();
+#endif
+
 	active_port = getenv("active_port");
 	if (active_port != NULL) {
 		current_active_port = simple_strtol(active_port, NULL, 10);
@@ -1088,7 +1100,8 @@ static int ipq5332_eth_init(struct eth_device *eth_dev, bd_t *this)
 			clk[3] = 0x0;
 			if ((phy_info->phy_type == QCA8081_PHY_TYPE) ||
 				(phy_info->phy_type == QCA8084_PHY_TYPE) ||
-				(phy_info->phy_type == QCA8033_PHY_TYPE)) {
+				(phy_info->phy_type == QCA8033_PHY_TYPE) ||
+				(sfp_mode == EPORT_WRAPPER_SGMII_FIBER)) {
 				clk[0] = 0x301;
 				clk[2] = 0x401;
 			}
@@ -1233,6 +1246,11 @@ static void ipq5332_eth_halt(struct eth_device *dev)
 	pr_debug("GMAC1 RXGOODBYTE_H(0x3a001288):%x\n", readl(0x3a001288));
 	pr_debug("GMAC1 RXBADBYTE_L(0x3a00128c):%x\n", readl(0x3a00128c));
 	pr_debug("GMAC1 RXBADBYTE_H(0x3a001290):%x\n", readl(0x3a001290));
+
+#ifndef CONFIG_SYS_NONCACHED_MEMORY
+	if(sfi->flash_type)
+		dcache_enable();
+#endif
 
 	pr_info("%s: done\n", __func__);
 }
@@ -1850,7 +1868,9 @@ int ipq5332_edma_init(void *edma_board_cfg)
 	/*
 	 * Init non cache buffer
 	 */
+#ifdef CONFIG_SYS_NONCACHED_MEMORY
 	noncached_init();
+#endif
 
 	node = fdt_path_offset(gd->fdt_blob, "/ess-switch");
 #ifdef CONFIG_QCA8084_SWT_MODE
@@ -2184,4 +2204,19 @@ init_failed:
 	}
 
 	return -1;
+}
+
+void ipq_eth_cleanup(struct eth_device *dev)
+{
+	struct ipq5332_eth_dev *priv = dev->priv;
+	struct ipq5332_edma_common_info *c_info = priv->c_info;
+	struct ipq5332_edma_hw *ehw = &c_info->hw;
+
+	ipq5332_edma_disable_intr(ehw);
+
+	ipq5332_edma_disable_rings(ehw);
+
+	ipq5332_edma_reg_write(IPQ5332_EDMA_REG_PORT_CTRL, 0);
+
+	return;
 }

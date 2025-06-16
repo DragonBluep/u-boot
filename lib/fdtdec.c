@@ -80,12 +80,14 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(QCA_QUP_I2C, "qcom,qup-ip2c"),
 };
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 const char *fdtdec_get_compatible(enum fdt_compat_id id)
 {
 	/* We allow reading of the 'unknown' ID for testing purposes */
 	assert(id >= 0 && id < COMPAT_COUNT);
 	return compat_names[id];
 }
+#endif
 
 fdt_addr_t fdtdec_get_addr_size_fixed(const void *blob, int node,
 		const char *prop_name, int index, int na, int ns,
@@ -136,6 +138,7 @@ fdt_addr_t fdtdec_get_addr_size_fixed(const void *blob, int node,
 	return addr;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 fdt_addr_t fdtdec_get_addr_size_auto_parent(const void *blob, int parent,
 		int node, const char *prop_name, int index, fdt_size_t *sizep)
 {
@@ -177,6 +180,7 @@ fdt_addr_t fdtdec_get_addr_size_auto_noparent(const void *blob, int node,
 	return fdtdec_get_addr_size_auto_parent(blob, parent, node, prop_name,
 						index, sizep);
 }
+#endif
 
 fdt_addr_t fdtdec_get_addr_size(const void *blob, int node,
 		const char *prop_name, fdt_size_t *sizep)
@@ -188,6 +192,7 @@ fdt_addr_t fdtdec_get_addr_size(const void *blob, int node,
 					  ns, sizep);
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 fdt_addr_t fdtdec_get_addr(const void *blob, int node,
 		const char *prop_name)
 {
@@ -351,6 +356,7 @@ int fdtdec_get_pci_bar32(const void *blob, int node,
 	return 0;
 }
 #endif
+#endif
 
 uint64_t fdtdec_get_uint64(const void *blob, int node, const char *prop_name,
 		uint64_t default_val)
@@ -382,6 +388,7 @@ int fdtdec_get_is_enabled(const void *blob, int node)
 	return 1;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 enum fdt_compat_id fdtdec_lookup(const void *blob, int node)
 {
 	enum fdt_compat_id id;
@@ -393,6 +400,7 @@ enum fdt_compat_id fdtdec_lookup(const void *blob, int node)
 			return id;
 	return COMPAT_UNKNOWN;
 }
+#endif
 
 int fdtdec_next_compatible(const void *blob, int node,
 		enum fdt_compat_id id)
@@ -400,6 +408,7 @@ int fdtdec_next_compatible(const void *blob, int node,
 	return fdt_node_offset_by_compatible(blob, node, compat_names[id]);
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdtdec_next_compatible_subnode(const void *blob, int node,
 		enum fdt_compat_id id, int *depthp)
 {
@@ -559,6 +568,7 @@ int fdtdec_add_aliases_for_id(const void *blob, const char *name,
 
 	return num_found;
 }
+#endif
 
 int fdtdec_get_alias_seq(const void *blob, const char *base, int offset,
 			 int *seqp)
@@ -622,6 +632,7 @@ int fdtdec_get_chosen_node(const void *blob, const char *name)
 	return fdt_path_offset(blob, prop);
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdtdec_check_fdt(void)
 {
 	/*
@@ -633,6 +644,7 @@ int fdtdec_check_fdt(void)
 	assert(!fdtdec_prepare_fdt());
 	return 0;
 }
+#endif
 
 /*
  * This function is a little odd in that it accesses global data. At some
@@ -660,6 +672,7 @@ int fdtdec_prepare_fdt(void)
 	return 0;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdtdec_lookup_phandle(const void *blob, int node, const char *prop_name)
 {
 	const u32 *phandle;
@@ -673,6 +686,7 @@ int fdtdec_lookup_phandle(const void *blob, int node, const char *prop_name)
 	lookup = fdt_node_offset_by_phandle(blob, fdt32_to_cpu(*phandle));
 	return lookup;
 }
+#endif
 
 /**
  * Look up a property in a node and check that it has a minimum length.
@@ -718,6 +732,7 @@ int fdtdec_get_int_array(const void *blob, int node, const char *prop_name,
 	return err;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdtdec_get_int_array_count(const void *blob, int node,
 			       const char *prop_name, u32 *array, int count)
 {
@@ -1004,6 +1019,7 @@ int fdtdec_read_fmap_entry(const void *blob, int node, const char *name,
 
 	return 0;
 }
+#endif
 
 u64 fdtdec_get_number(const fdt32_t *ptr, unsigned int cells)
 {
@@ -1015,6 +1031,7 @@ u64 fdtdec_get_number(const fdt32_t *ptr, unsigned int cells)
 	return number;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdt_get_resource(const void *fdt, int node, const char *property,
 		     unsigned int index, struct fdt_resource *res)
 {
@@ -1214,6 +1231,7 @@ int fdtdec_decode_display_timing(const void *blob, int parent, int index,
 
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_OF_COMBINE
 

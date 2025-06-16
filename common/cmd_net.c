@@ -14,6 +14,7 @@
 
 static int netboot_common(enum proto_t, cmd_tbl_t *, int, char * const []);
 
+#ifndef CONFIG_CMD_DISABLE_BOOTP
 static int do_bootp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	return netboot_common(BOOTP, cmdtp, argc, argv);
@@ -24,6 +25,7 @@ U_BOOT_CMD(
 	"boot image via network using BOOTP/TFTP protocol",
 	"[loadAddress] [[hostIPaddr:]bootfilename]"
 );
+#endif
 
 int do_tftpb(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
@@ -248,7 +250,9 @@ static int netboot_common(enum proto_t proto, cmd_tbl_t *cmdtp, int argc,
 
 	bootstage_mark(BOOTSTAGE_ID_NET_LOADED);
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	rcode = bootm_maybe_autostart(cmdtp, argv[0]);
+#endif
 
 	if (rcode == CMD_RET_SUCCESS)
 		bootstage_mark(BOOTSTAGE_ID_NET_DONE);

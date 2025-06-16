@@ -47,6 +47,11 @@
 #define CONFIG_SYS_MMC_CRASHDUMP_DEV	0
 #endif
 
+#define MINIDUMP_MAGIC1_COOKIE				0x4D494E49
+#define MINIDUMP_MAGIC2_COOKIE				0x44554D50
+#define DEFAULT_MINIDUMP_LIST_ENTRY_MAX			256
+#define MINIDUMP_LIST_ENTRY_INC_ORDER			128
+
 #define CONFIG_TZ_SIZE			0x400000
 DECLARE_GLOBAL_DATA_PTR;
 static qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
@@ -121,6 +126,34 @@ struct crashdump_flash_emmc_cxt {
 };
 #endif
 
+struct memdumps_list_info {
+	char name[20];
+	uint64_t offset;
+	uint64_t size;
+};
+
+struct memdump_hdr {
+	uint32_t magic1;
+	uint32_t magic2;
+	uint32_t nos_dumps;
+	uint32_t total_dump_sz;
+	uint64_t dumps_list_info_offset;
+	uint32_t reserved[2];
+};
+
+struct dump2nvmem_config {
+	int flash_type;
+	uint32_t offset;
+	uint32_t dump_off;
+	uint32_t size;
+	uint32_t blksize;
+};
+
+void *crashdump_cnxt;
+int (*crashdump_flash_write)(void *cnxt, unsigned char *data, unsigned int size);
+int (*crashdump_flash_write_init)(void *cnxt, loff_t offset, unsigned int total_size);
+int (*crashdump_flash_write_deinit)(void *cnxt);
+
 #ifdef CONFIG_MTD_DEVICE
 static struct crashdump_flash_nand_cxt crashdump_nand_cnxt;
 #endif
@@ -134,9 +167,25 @@ static struct crashdump_flash_emmc_cxt crashdump_emmc_cnxt;
 #endif
 static struct qca_wdt_crashdump_data g_crashdump_data;
 struct qca_wdt_scm_tlv_msg tlv_msg ;
+
+static ulong dump2mem_addr_curr = 0, dump2mem_addr = 0, dump2mem_addr_limit =0;
+static uint32_t dumplist_entrymax = DEFAULT_MINIDUMP_LIST_ENTRY_MAX;
+static struct memdump_hdr dump2mem_hdr;
+static struct dump2nvmem_config dump2nvmem_info;
+static struct memdumps_list_info *dumps_list = NULL;
+
 __weak int scm_set_boot_addr(bool enable_sec_core)
 {
 	return -1;
+}
+
+__weak void crashdump_exit(void)
+{
+#ifdef CONFIG_SKIP_RESET
+	run_command("bootipq", 0);
+#else
+	reset_board();
+#endif
 }
 
 static int krait_release_secondary(void)
@@ -168,13 +217,21 @@ static int krait_release_secondary(void)
 	return 0;
 }
 
-static int dump_to_dst (int is_aligned_access, uint32_t memaddr, uint32_t size, char *name)
+static int dump_to_dst (int is_aligned_access, uint32_t memaddr, uint32_t size, char *name,
+		unsigned int dump_level)
 {
 	char runcmd[256];
-	char *usb_dump = NULL;
+	char *usb_dump = NULL, *dump2mem = NULL, *dump2nvmem = NULL;
 	ulong is_usb_dump = 0;
 	int ret = 0;
 
+	if (!size) {
+		printf("Skipping %s dump, due to size zero\n", name);
+		return CMD_RET_SUCCESS;
+	}
+
+	dump2nvmem = getenv("dump_to_nvmem");
+	dump2mem = getenv("dump_to_mem");
 	usb_dump = getenv("dump_to_usb");
 	if (usb_dump) {
 		ret = str2long(usb_dump, &is_usb_dump);
@@ -201,7 +258,65 @@ static int dump_to_dst (int is_aligned_access, uint32_t memaddr, uint32_t size, 
 	if (is_usb_dump == 1)
 		snprintf(runcmd, sizeof(runcmd), "fatwrite usb %x:%x 0x%x %s 0x%x",
 					usb_dev_indx, usb_dev_part, memaddr, name, size);
-	else {
+	else if (dump2mem && (dump_level == MINIMAL_DUMP)) {
+		int idx = dump2mem_hdr.nos_dumps++;
+
+		if (idx >= dumplist_entrymax) {
+			dumplist_entrymax += MINIDUMP_LIST_ENTRY_INC_ORDER;
+			dumps_list = realloc(dumps_list,
+					dumplist_entrymax * sizeof(struct memdumps_list_info));
+			if (!dumps_list) {
+				printf("failed to do realloc the minidumps list entry table\n");
+				return CMD_RET_FAILURE;
+			}
+		}
+
+		strlcpy(dumps_list[idx].name, name, sizeof(dumps_list[idx].name));
+		dumps_list[idx].offset = dump2mem_addr_curr - dump2mem_addr;
+		dumps_list[idx].size = size;
+		snprintf(runcmd, sizeof(runcmd), "cp.l 0x%x 0x%lx 0x%x",
+				memaddr, dump2mem_addr_curr, size);
+
+		if (roundup(dump2mem_addr_curr + size, ARCH_DMA_MINALIGN) > dump2mem_addr_limit) {
+			printf("Error: Not enough memory in rsvd mem to save dumps\n");
+			return CMD_RET_FAILURE;
+		}
+
+		printf("Dumping %s @ 0x%lX \n", dumps_list[idx].name, dump2mem_addr_curr);
+		dump2mem_addr_curr = roundup(dump2mem_addr_curr + size, ARCH_DMA_MINALIGN);
+
+	} else if (dump2nvmem && (dump_level == MINIMAL_DUMP)) {
+		int idx = dump2mem_hdr.nos_dumps++;
+
+		if (idx >= dumplist_entrymax) {
+			dumplist_entrymax += MINIDUMP_LIST_ENTRY_INC_ORDER;
+			dumps_list = realloc(dumps_list,
+					dumplist_entrymax * sizeof(struct memdumps_list_info));
+			if (!dumps_list) {
+				printf("failed to do realloc the minidumps list entry table\n");
+				return CMD_RET_FAILURE;
+			}
+		}
+
+		strlcpy(dumps_list[idx].name, name, sizeof(dumps_list[idx].name));
+		dumps_list[idx].offset = dump2mem_addr_curr;
+		dumps_list[idx].size = size;
+
+		if (dump2mem_addr_curr + size > dump2nvmem_info.size) {
+			printf("Error: Not enough memory in %s partition to save dumps\n", dump2nvmem);
+			return CMD_RET_FAILURE;
+		}
+
+		ret = crashdump_flash_write(crashdump_cnxt, (unsigned char *)memaddr, size);
+		if (ret)
+			return ret;
+
+		printf("Writing %s in %s @ offset 0x%lx\n", dumps_list[idx].name,
+				dump2nvmem, dump2mem_addr_curr);
+		dump2mem_addr_curr += size;
+
+		return CMD_RET_SUCCESS;
+	} else {
 		char *dumpdir;
 		dumpdir = getenv("dumpdir");
 		if (dumpdir != NULL) {
@@ -315,7 +430,7 @@ static int qca_wdt_extract_crashdump_data(
 			scm_tlv_msg->cur_msg_buffer_pos += tlv_size;
 			break;
 		default:
-			printf("%s: invalid dump type\n", __func__);
+			printf("%s: No valid dump found\n", __func__);
 			ret_val = -EINVAL;
 			goto err;
 		}
@@ -422,7 +537,7 @@ static int dump_wlan_segments(struct dumpinfo_t *dumpinfo, int indx)
 			}
 
 			ret_val = dump_to_dst (dumpinfo[indx].is_aligned_access,memaddr,
-						wlan_tlv_size, wlan_segment_name);
+						wlan_tlv_size, wlan_segment_name, dumpinfo[indx].dump_level);
 			crashdump_tlv_count++;
 			udelay(10000); /* give some delay for server */
 			if (ret_val == CMD_RET_FAILURE)
@@ -471,15 +586,84 @@ static int do_dumpqca_data(unsigned int dump_level)
 	int indx;
 	int ebi_indx = 0;
 	int ret = CMD_RET_FAILURE;
-#ifdef CONFIG_IPQ5018
+#if defined(CONFIG_IPQ5018) && !defined(CONFIG_DISABLE_SIGNED_BOOT)
 	char buf = 1;
 #endif
 	struct dumpinfo_t *dumpinfo = dumpinfo_n;
 	int dump_entries = dump_entries_n;
 	char wlan_segment_name[32], runcmd[128], *s;
 	char *usb_dump = NULL, *compress = NULL;
-	ulong is_usb_dump = 0, is_compress = 0;
+	char *dump2mem = NULL, *dump2mem_addr_s = NULL, *dump2mem_sz_s = NULL;
+	char *dump2nvmem = NULL;
+	ulong is_usb_dump = 0, is_compress = 0, dump2mem_sz = 0;
 	char temp[256];
+
+	dump2mem = getenv("dump_to_mem");
+	if (dump2mem && (dump_level == MINIMAL_DUMP)) {
+		dump2mem_addr_s = strsep(&dump2mem, " ");
+		if (!dump2mem_addr_s ||
+				!str2long(dump2mem_addr_s, &dump2mem_addr)) {
+			printf("\nError: Failed to decode dump_to_mem addr\n");
+			return -EINVAL;
+		}
+
+		dump2mem_sz_s = strsep(&dump2mem, " ");
+		if (!dump2mem_sz_s ||
+				!str2long(dump2mem_sz_s, &dump2mem_sz)) {
+			printf("\nError: Failed to decode dump_to_mem size\n");
+			return -EINVAL;
+		}
+
+		/* range check for the dump2mem_addr */
+		if ((dump2mem_addr < CONFIG_SYS_SDRAM_BASE) ||
+			(dump2mem_addr > CONFIG_SYS_SDRAM_BASE
+			 + gd->ram_size - dump2mem_sz)) {
+			printf("\nError: Invalid dump_to_mem param\n");
+			return -EINVAL;
+		}
+
+		snprintf(runcmd, sizeof(runcmd), "mw 0x%lx 0xffffffff 0x8",
+				dump2mem_addr);
+		if (run_command(runcmd, 0) != CMD_RET_SUCCESS) {
+			printf("\nError: failed to access memory region\n");
+			return -EIO;
+		}
+
+		dump2mem_addr_curr = dump2mem_addr;
+		dump2mem_hdr.magic1 = MINIDUMP_MAGIC1_COOKIE;
+		dump2mem_hdr.magic2 = MINIDUMP_MAGIC2_COOKIE;
+		dump2mem_hdr.nos_dumps = 0;
+		dump2mem_hdr.total_dump_sz = 0;
+		dump2mem_hdr.dumps_list_info_offset = 0;
+		dumps_list = malloc(dumplist_entrymax *	sizeof(struct memdumps_list_info));
+		dump2mem_addr_limit = dump2mem_addr + dump2mem_sz;
+
+		dump2mem_addr_curr = roundup(dump2mem_addr_curr +
+				sizeof(struct memdump_hdr), ARCH_DMA_MINALIGN);
+
+	}
+
+	dump2nvmem = getenv("dump_to_nvmem");
+	if (dump2nvmem && (dump_level == MINIMAL_DUMP)) {
+		snprintf(runcmd, sizeof(runcmd), "flasherase %s", dump2nvmem);
+		ret = run_command(runcmd, 0);
+		if (ret)
+			return ret;
+
+		dump2mem_addr = dump2nvmem_info.offset;
+		dump2mem_hdr.magic1 = MINIDUMP_MAGIC1_COOKIE;
+		dump2mem_hdr.magic2 = MINIDUMP_MAGIC2_COOKIE;
+		dump2mem_hdr.nos_dumps = 0;
+		dump2mem_hdr.total_dump_sz = 0;
+		dump2mem_hdr.dumps_list_info_offset = 0;
+		dumps_list = malloc(dumplist_entrymax *	sizeof(struct memdumps_list_info));
+		dump2mem_addr_curr = dump2nvmem_info.blksize;
+
+		ret = crashdump_flash_write_init(crashdump_cnxt,
+				dump2nvmem_info.offset + dump2nvmem_info.dump_off, 0);
+		if (ret)
+			return ret;
+	}
 
 	usb_dump = getenv("dump_to_usb");
 	if (usb_dump) {
@@ -557,7 +741,7 @@ static int do_dumpqca_data(unsigned int dump_level)
 #endif
 	}
 
-#ifdef CONFIG_IPQ5018
+#if defined(CONFIG_IPQ5018) && !defined(CONFIG_DISABLE_SIGNED_BOOT)
 	ret = qca_scm_call(SCM_SVC_FUSE,
 			   QFPROM_IS_AUTHENTICATE_CMD, &buf, sizeof(char));
 	if (ret == 0 && buf == 1) {
@@ -578,6 +762,14 @@ static int do_dumpqca_data(unsigned int dump_level)
 	}
 
 	for (indx = 0; indx < dump_entries; indx++) {
+
+#ifdef DUMP_TME_LOG
+		if(!strncmp(dumpinfo[indx].name, "IMEM2.BIN", 9) &&
+			qca_scm_is_feature_available(TME_LOG_DUMP_FEATURE_ID) \
+			!= TME_LOG_DUMP_FEATURE_VERSION)
+			continue;
+#endif
+
 		if (dump_level != dumpinfo[indx].dump_level)
 			continue;
 
@@ -613,11 +805,13 @@ static int do_dumpqca_data(unsigned int dump_level)
 					dumpinfo[indx].size = gd->ram_size / 2;
 					comp_addr = memaddr;
 				}
+#ifndef CONFIG_DISABLE_SIGNED_BOOT
 				snprintf(temp, sizeof(temp), "%sEBICS_S2", dump_prefix);
 				if (!strncmp(dumpinfo[indx].name, temp, strlen(temp))) {
 					dumpinfo[indx].size = gd->ram_size - (dumpinfo[indx].start - CONFIG_SYS_SDRAM_BASE);
 					comp_addr = memaddr;
 				}
+#endif
 				snprintf(temp, sizeof(temp), "%sEBICS1", dump_prefix);
 				if (!strncmp(dumpinfo[indx].name, temp, strlen(temp))) {
 					dumpinfo[indx].size = (gd->ram_size / 2)
@@ -629,12 +823,14 @@ static int do_dumpqca_data(unsigned int dump_level)
 				if (!strncmp(dumpinfo[indx].name,
 					     temp, strlen(temp)))
 					dumpinfo[indx].size = gd->ram_size;
+#ifndef CONFIG_DISABLE_SIGNED_BOOT
 				snprintf(temp, sizeof(temp), "%sEBICS_S1", dump_prefix);
 				if (!strncmp(dumpinfo[indx].name,
 					     temp, strlen(temp)))
 					dumpinfo[indx].size = gd->ram_size
 							      - dumpinfo[indx - 1].size
 							      - CONFIG_TZ_SIZE;
+#endif
 			}
 
 			if (is_compress == 1 && (dumpinfo[indx].to_compress == 1)) {
@@ -657,7 +853,7 @@ static int do_dumpqca_data(unsigned int dump_level)
 
 			if (is_usb_dump == 1 || is_compress == 1) {
 				printf("\nProcessing %s:\n", dumpinfo[indx].name);
-				ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, dumpinfo[indx].name);
+				ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, dumpinfo[indx].name, dumpinfo[indx].dump_level);
 				if (ret == CMD_RET_FAILURE) {
 					goto stop_dump;
 				}
@@ -675,7 +871,7 @@ static int do_dumpqca_data(unsigned int dump_level)
 					}
 
 					printf("\nProcessing %s:\n", dumpinfo[indx].name);
-					ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, dumpinfo[indx].name);
+					ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, dumpinfo[indx].name, dumpinfo[indx].dump_level);
 					if (ret == CMD_RET_FAILURE)
 						goto stop_dump;
 
@@ -693,12 +889,12 @@ static int do_dumpqca_data(unsigned int dump_level)
 			if (dumpinfo[indx].size && memaddr) {
 				if(dumpinfo[indx].dump_level == MINIMAL_DUMP){
 					snprintf(wlan_segment_name, sizeof(wlan_segment_name), "%lx.BIN",(long unsigned int)memaddr);
-					ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, wlan_segment_name);
+					ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, wlan_segment_name, dumpinfo[indx].dump_level);
 					if (ret == CMD_RET_FAILURE)
 						goto stop_dump;
 				}
 				else {
-					ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, dumpinfo[indx].name);
+					ret = dump_to_dst (dumpinfo[indx].is_aligned_access, memaddr, dumpinfo[indx].size, dumpinfo[indx].name, dumpinfo[indx].dump_level);
 					if (ret == CMD_RET_FAILURE)
 						goto stop_dump;
 				}
@@ -712,6 +908,76 @@ static int do_dumpqca_data(unsigned int dump_level)
 	}
 
 stop_dump:
+	if (getenv("dump_to_mem") && (dump_level == MINIMAL_DUMP)) {
+		if (ret != CMD_RET_SUCCESS)
+			return ret;
+
+		snprintf(runcmd, sizeof(runcmd), "cp.l 0x%x 0x%lx 0x%x",
+				(unsigned int)dumps_list, dump2mem_addr_curr,
+				dump2mem_hdr.nos_dumps * sizeof(struct memdumps_list_info));
+		if (run_command(runcmd, 0) != CMD_RET_SUCCESS) {
+			printf("failed to dump at the addr 0x%lx\n", dump2mem_addr_curr);
+			return -EINVAL;
+		}
+
+		free(dumps_list);
+
+		dump2mem_hdr.total_dump_sz = dump2mem_addr_curr +
+			(dump2mem_hdr.nos_dumps * sizeof(struct memdumps_list_info)) - dump2mem_addr;
+		dump2mem_hdr.dumps_list_info_offset = dump2mem_addr_curr - dump2mem_addr;
+
+		if ((dump2mem_addr + dump2mem_hdr.total_dump_sz)
+				> dump2mem_addr_limit) {
+			printf("Error: Not enough memory in rsvd mem to save dumps\n");
+			return CMD_RET_FAILURE;
+		}
+
+		snprintf(runcmd, sizeof(runcmd), "cp.l 0x%x 0x%lx 0x%x",
+				(unsigned int)&dump2mem_hdr, dump2mem_addr, sizeof(struct memdump_hdr));
+		if (run_command(runcmd, 0) != CMD_RET_SUCCESS) {
+			printf("failed to dump at the addr 0x%lx\n", dump2mem_addr);
+			return -EINVAL;
+		}
+	}
+
+	if (dump2nvmem && (dump_level == MINIMAL_DUMP)) {
+		if (ret != CMD_RET_SUCCESS)
+			return ret;
+
+		/* updating dump_list in flash at the end */
+		ret = crashdump_flash_write(crashdump_cnxt, (unsigned char *)dumps_list,
+				dump2mem_hdr.nos_dumps * sizeof(struct memdumps_list_info));
+		if (ret)
+			return ret;
+
+		ret = crashdump_flash_write_deinit(crashdump_cnxt);
+		if (ret)
+			return ret;
+
+		dump2mem_hdr.total_dump_sz = dump2mem_addr_curr +
+			(dump2mem_hdr.nos_dumps * sizeof(struct memdumps_list_info));
+		dump2mem_hdr.dumps_list_info_offset = dump2mem_addr_curr;
+
+		if (dump2mem_hdr.total_dump_sz > dump2nvmem_info.size) {
+			printf("Error: Not enough memory in %s partition to save dumps", dump2nvmem);
+			return CMD_RET_FAILURE;
+		}
+
+		/* updating memdump_hdr in flash at the first block */
+		ret = crashdump_flash_write_init(crashdump_cnxt, dump2mem_addr, 0);
+		if (ret)
+			return ret;
+
+		ret = crashdump_flash_write(crashdump_cnxt, (unsigned char *)&dump2mem_hdr,
+				sizeof(struct memdump_hdr));
+		if (ret)
+			return ret;
+
+		ret = crashdump_flash_write_deinit(crashdump_cnxt);
+		if (ret)
+			return ret;
+	}
+
 #if defined(CONFIG_USB_STORAGE) && defined(CONFIG_FS_FAT)
 	if (is_usb_dump == 1) {
 		mdelay(2000);
@@ -746,7 +1012,7 @@ void dump_func(unsigned int dump_level)
 			printf("Using serverip from env %s\n", serverip);
 		} else {
 			printf("\nServer ip not found, run dhcp or configure\n");
-			goto reset;
+			goto exit;
 		}
 		printf("Trying to ping server.....\n");
 		snprintf(runcmd, sizeof(runcmd), "ping %s", serverip);
@@ -760,17 +1026,17 @@ void dump_func(unsigned int dump_level)
 		}
 		if (ping_status != 1) {
 			printf("Ping failed\n");
-			goto reset;
+			goto exit;
 		}
 		if (do_dumpqca_data(dump_level) == CMD_RET_FAILURE)
 			printf("Crashdump saving failed!\n");
-		goto reset;
+		goto exit;
 	} else {
 		etime = get_timer_masked() + (10 * CONFIG_SYS_HZ);
 		printf("\nHit any key within 10s to stop dump activity...");
 		while (!tstc()) {       /* while no incoming data */
 			if (get_timer_masked() >= etime) {
-				if (getenv("dump_minimal_and_full")) { 
+				if (getenv("dump_minimal_and_full")) {
 					/* dump minidump and full dump*/
 					if (do_dumpqca_data(MINIMAL_DUMP) == CMD_RET_FAILURE)
 						printf("Minidump saving failed!\n");
@@ -787,8 +1053,8 @@ void dump_func(unsigned int dump_level)
 	/* reset the system, some images might not be loaded
 	 * when crashmagic is found
 	 */
-reset:
-	reset_board();
+exit:
+	crashdump_exit();
 }
 #ifdef CONFIG_MTD_DEVICE
 
@@ -1238,24 +1504,9 @@ int crashdump_emmc_flash_write_data(void *cnxt,
 }
 #endif
 
-/*
-* This function writes the crashdump data in flash memory.
-* It has function pointers for init, deinit and writing. These
-* function pointers are being initialized with respective flash
-* memory writing routines.
-*/
-static int qca_wdt_write_crashdump_data(
-		struct qca_wdt_crashdump_data *crashdump_data,
-		int flash_type, loff_t crashdump_offset)
+static int qca_wdt_write_crashdump_configure(int flash_type)
 {
 	int ret = 0;
-	void *crashdump_cnxt;
-	int (*crashdump_flash_write)(void *cnxt, unsigned char *data,
-					unsigned int size);
-	int (*crashdump_flash_write_init)(void *cnxt, loff_t offset,
-					unsigned int total_size);
-	int (*crashdump_flash_write_deinit)(void *cnxt);
-	unsigned int required_size;
 
 	/*
 	* Determine the flash type and initialize function pointer for flash
@@ -1309,6 +1560,95 @@ static int qca_wdt_write_crashdump_data(
 		return -EINVAL;
 	}
 
+	return ret;
+}
+
+void set_minidump_bootargs(void)
+{
+	char runcmd[128], *part_name = getenv("dump_to_nvmem");
+	int flash_type = sfi->flash_type;
+	uint32_t * buf = NULL;
+
+	switch (sfi->flash_type) {
+	case SMEM_BOOT_NAND_FLASH:
+	case SMEM_BOOT_QSPI_NAND_FLASH:
+	case SMEM_BOOT_MMC_FLASH:
+		flash_type = sfi->flash_type;
+		break;
+
+	case SMEM_BOOT_SPI_FLASH:
+		if (get_which_flash_param(part_name))
+			flash_type = SMEM_BOOT_QSPI_NAND_FLASH;
+		else
+			flash_type = SMEM_BOOT_MMC_FLASH;
+		break;
+	default:
+		goto retn;
+	}
+
+
+	if ((flash_type == SMEM_BOOT_NAND_FLASH) ||
+			(flash_type == SMEM_BOOT_QSPI_NAND_FLASH)) {
+#ifdef CONFIG_MTD_DEVICE
+		uint32_t offset, part_size, read_size = 64;
+
+		if (getpart_offset_size(part_name, &offset, &part_size))
+			goto retn;
+
+		buf = malloc(read_size);
+		if (!buf)
+			goto retn;
+
+		snprintf(runcmd, sizeof(runcmd), "nand read 0x%x 0x%x 0x%x",
+				(uint32_t)buf, offset, read_size);
+#endif
+	} else {
+#ifdef CONFIG_QCA_MMC
+		block_dev_desc_t *blk_dev = mmc_get_dev(0);
+		disk_partition_t disk_info;
+
+		if (!blk_dev)
+			goto retn;
+
+		if (get_partition_info_efi_by_name(blk_dev, part_name,
+					&disk_info))
+			goto retn;
+
+		buf = malloc(disk_info.blksz);
+		if (!buf)
+			goto retn;
+
+		snprintf(runcmd, sizeof(runcmd), "mmc read 0x%x 0x%lx 0x1",
+				(uint32_t)buf, disk_info.start);
+#endif
+	}
+
+	if (run_command(runcmd, 0)) {
+		free(buf);
+		goto retn;
+	}
+
+	if (buf && (buf[0] == MINIDUMP_MAGIC1_COOKIE) &&
+			(buf[1] == MINIDUMP_MAGIC2_COOKIE))
+		run_command("setenv bootargs ${bootargs} collect_minidump", 0);
+
+retn:
+	return;
+}
+
+/*
+* This function writes the crashdump data in flash memory.
+* It has function pointers for init, deinit and writing. These
+* function pointers are being initialized with respective flash
+* memory writing routines.
+*/
+static int qca_wdt_write_crashdump_data(
+		struct qca_wdt_crashdump_data *crashdump_data,
+		loff_t crashdump_offset)
+{
+	int ret = 0;
+	unsigned int required_size;
+
 	/* Start writing cpu context and uname in flash */
 	required_size = CONFIG_CPU_CONTEXT_DUMP_SIZE +
 				crashdump_data->uname_length;
@@ -1351,7 +1691,17 @@ int do_dumpqca_minimal_data(const char *offset)
 	int flash_type;
 	int ret_val;
 	loff_t crashdump_offset;
+	char *dump_to_flash = getenv("dump_to_flash");
+	char *dump_to_nvmem = NULL;
 
+	if (dump_to_flash) {
+		setenv("dump_to_nvmem", "");
+		setenv("dump_to_mem", "");
+	} else {
+		dump_to_nvmem = getenv("dump_to_nvmem");
+		if (dump_to_nvmem)
+			setenv("dump_to_mem", "");
+	}
 
 	if (sfi->flash_type == SMEM_BOOT_NAND_FLASH) {
 		flash_type = SMEM_BOOT_NAND_FLASH;
@@ -1384,9 +1734,83 @@ int do_dumpqca_minimal_data(const char *offset)
 		return ret_val;
 	}
 
-	if (getenv("dump_to_flash")) {
+	if (dump_to_flash || dump_to_nvmem)
+	{
+		if (dump_to_nvmem) {
+			if (flash_type == SMEM_BOOT_SPI_FLASH) {
+				if (get_which_flash_param(dump_to_nvmem))
+					flash_type = SMEM_BOOT_QSPI_NAND_FLASH;
+				else
+					flash_type = SMEM_BOOT_MMC_FLASH;
+			}
+
+			dump2nvmem_info.flash_type = flash_type;
+			if ((flash_type == SMEM_BOOT_NAND_FLASH) ||
+					(flash_type == SMEM_BOOT_QSPI_NAND_FLASH)) {
+#ifdef CONFIG_MTD_DEVICE
+				uint32_t off, size, valid_start_off;
+				uint8_t valid_start_found = 0;
+				ret_val = getpart_offset_size(dump_to_nvmem,
+						&off, &size);
+ 				if (ret_val) {
+					printf("Error: %s Invalid partition\n", dump_to_nvmem);
+					return ret_val;
+				}
+
+				dump2nvmem_info.offset = valid_start_off = off;
+				dump2nvmem_info.size = size;
+				dump2nvmem_info.blksize = nand_info[0].erasesize;
+				dump2nvmem_info.dump_off = nand_info[0].erasesize;;
+				for (; off < (dump2nvmem_info.offset + size);
+						off += nand_info[0].erasesize) {
+					if (nand_block_isbad(&nand_info[0], off)) {
+						dump2nvmem_info.size -= nand_info[0].erasesize;
+					} else if (!valid_start_found) {
+						valid_start_off = off;
+						valid_start_found = 1;
+					}
+				}
+
+				if (!dump2nvmem_info.size) {
+					printf("Error: %s bad partition\n", dump_to_nvmem);
+					return -EIO;
+				} else
+					dump2nvmem_info.offset = valid_start_off;
+#endif
+			} else {
+#ifdef CONFIG_QCA_MMC
+				block_dev_desc_t *blk_dev = mmc_get_dev(0);
+				disk_partition_t disk_info;
+
+				if (!blk_dev) {
+					printf("Error: %s Invalid partition\n", dump_to_nvmem);
+					return ret_val;
+				}
+
+				ret_val = get_partition_info_efi_by_name(blk_dev,
+						dump_to_nvmem, &disk_info);
+				if (ret_val) {
+					printf("Error: %s Invalid partition\n", dump_to_nvmem);
+					return ret_val;
+				}
+
+				dump2nvmem_info.offset = disk_info.start;
+				dump2nvmem_info.dump_off = 1;
+				dump2nvmem_info.blksize = disk_info.blksz;
+				dump2nvmem_info.size = disk_info.size * disk_info.blksz;
+#endif
+			}
+		}
+
+		ret_val = qca_wdt_write_crashdump_configure(flash_type);
+		if (ret_val) {
+			printf("crashdump configure flash failure\n");
+			return ret_val;
+		}
+	}
+
+	if (dump_to_flash) {
 		ret_val = qca_wdt_write_crashdump_data(&g_crashdump_data,
-						       flash_type,
 						       crashdump_offset);
 		if (ret_val) {
 			printf("crashdump data writing in flash failure\n");

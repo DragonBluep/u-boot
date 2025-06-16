@@ -58,6 +58,25 @@ void i2c_clock_config(void)
 }
 #endif
 
+#ifdef CONFIG_QCA_SPI
+void spi_clock_init(int spi_id)
+{
+	int cfg;
+
+	/* Configure qup1_spi_apps_clk_src */
+	cfg = (GCC_BLSP_QUP_SPI_SRC_SEL |
+		GCC_BLSP_QUP_SPI_SRC_DIV);
+
+	writel(cfg, GCC_BLSP1_QUP_SPI_APPS_CFG_RCGR(spi_id));
+	writel(CMD_UPDATE, GCC_BLSP1_QUP_SPI_APPS_CMD_RCGR(spi_id));
+	mdelay(100);
+	writel(ROOT_EN, GCC_BLSP1_QUP_SPI_APPS_CMD_RCGR(spi_id));
+
+	/* Configure CBCR */
+	writel(CLK_ENABLE, GCC_BLSP1_QUP_SPI_APPS_CBCR(spi_id));
+}
+#endif
+
 #if defined(CONFIG_QPIC_NAND) && defined(CONFIG_QSPI_SERIAL_TRAINING)
 __weak void qpic_set_clk_rate(unsigned int clk_rate, int blk_type,
 				int req_clk_src_type)

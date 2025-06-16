@@ -24,6 +24,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int arch_fixup_fdt(void *blob)
 {
 	bd_t *bd = gd->bd;
@@ -50,3 +51,4 @@ int arch_fixup_fdt(void *blob)
 #endif
 	return ret;
 }
+#endif

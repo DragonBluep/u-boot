@@ -119,12 +119,6 @@ struct scm_response {
 	u32	is_complete;
 };
 
-struct fuse_payload {
-	u32 fuse_addr;
-	u32 lsb_val;
-	u32 msb_val;
-};
-
 int scm_init(void);
 extern int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 		void *resp_buf, size_t resp_len);
@@ -134,11 +128,15 @@ int qca_scm_dpr(u32, u32, void *, size_t);
 int qca_scm_usb_mode_write(u32, u32);
 int qca_scm_call_write(u32, u32, u32 *, u32);
 int qca_scm_call_read(u32, u32, u32 *, u32*);
+long qca_scm_is_feature_available(u32);
 int qca_scm_crypto(int, void *, u32);
+int qca_scm_clear_key(u32, u32);
 int qca_scm_sdi(void);
 int qca_scm_dload(u32);
 int qca_scm_fuseipq(u32, u32, void *, size_t);
-int qca_scm_list_ipq5332_fuse(u32, u32, struct fuse_payload *, size_t);
+#ifdef CONFIG_LIST_FUSE
+int qca_scm_list_fuse(u32, u32, struct fuse_payload *, size_t);
+#endif
 bool is_scm_armv8(void);
 int qca_scm_secure_authenticate(void *cmd_buf, size_t cmd_len);
 int qca_scm_part_info(void *cmd_buf, size_t cmd_len);
@@ -226,9 +224,12 @@ typedef struct {
 #define	SCM_RW_OP   2
 #define	SCM_BUF_VAL 3
 
+#ifndef CONFIG_DISABLE_KERNEL64
 void __attribute__ ((noreturn)) jump_kernel64(void *kernel_entry,
 		void *fdt_addr);
+#endif
 
-
+#ifndef CONFIG_CMD_DISABLE_EXECTZT
 void __attribute__ ((noreturn)) execute_tzt(void *entry_addr);
+#endif
 #endif

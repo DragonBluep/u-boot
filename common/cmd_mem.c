@@ -33,6 +33,8 @@ DECLARE_GLOBAL_DATA_PTR;
 #define CONFIG_SYS_MEMTEST_SCRATCH 0
 #endif
 
+#define SECURE_BOARD_MAGIC	0x5ECB001
+
 static int mod_mem(cmd_tbl_t *, int, int, int, char * const []);
 
 /* Display values from last command.
@@ -170,6 +172,11 @@ static int do_mem_mw(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	int	size;
 	void *buf, *start;
 	ulong bytes;
+
+	if(SECURE_BOARD_MAGIC == gd->board_type) {
+		printf("Command not supported \'%s\'\n", argv[0]);
+		return 0;
+	}
 
 	if ((argc < 3) || (argc > 4))
 		return CMD_RET_USAGE;
@@ -492,6 +499,7 @@ static int do_mem_cp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return 0;
 }
 
+#ifndef CONFIG_CMD_DISABLE_BASE
 static int do_mem_base(cmd_tbl_t *cmdtp, int flag, int argc,
 		       char * const argv[])
 {
@@ -505,6 +513,14 @@ static int do_mem_base(cmd_tbl_t *cmdtp, int flag, int argc,
 	printf("Base Address: 0x%08lx\n", base_address);
 	return 0;
 }
+
+U_BOOT_CMD(
+	base,	2,	1,	do_mem_base,
+	"print or set address offset",
+	"\n    - print address offset for memory commands\n"
+	"base off\n    - set address offset for memory commands to 'off'"
+);
+#endif
 
 static int do_mem_loop(cmd_tbl_t *cmdtp, int flag, int argc,
 		       char * const argv[])
@@ -1341,13 +1357,6 @@ static int do_mem_info(cmd_tbl_t *cmdtp, int flag, int argc,
 	return 0;
 }
 #endif
-
-U_BOOT_CMD(
-	base,	2,	1,	do_mem_base,
-	"print or set address offset",
-	"\n    - print address offset for memory commands\n"
-	"base off\n    - set address offset for memory commands to 'off'"
-);
 
 U_BOOT_CMD(
 	loop,	3,	1,	do_mem_loop,

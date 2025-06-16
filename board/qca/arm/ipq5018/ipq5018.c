@@ -442,6 +442,7 @@ int apps_iscrashed(void)
 	return 0;
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_auto_restart(void *blob)
 {
 	const char *paniconwcssfatal;
@@ -458,6 +459,7 @@ void fdt_fixup_auto_restart(void *blob)
 	}
 	return;
 }
+#endif
 
 #ifdef CONFIG_IPQ_BT_SUPPORT
 int bt_running;
@@ -720,6 +722,7 @@ void board_nand_init(void)
 	gpio_node = fdt_path_offset(gd->fdt_blob, "/spi/spi_gpio");
 	if (gpio_node >= 0) {
 		qca_gpio_init(gpio_node);
+		spi_clock_init(0);
 #ifdef CONFIG_MTD_DEVICE
 		ipq_spi_init(CONFIG_IPQ_SPI_NOR_INFO_IDX);
 #endif
@@ -1999,6 +2002,7 @@ void board_update_caldata()
 	qca_scm_call_write(0x2, 0x23,(u32 *)IRON2G_RFA_RFA_OTP_OTP_XO_0, reg_val);
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_qpic(void *blob)
 {
 	int node_off, ret;
@@ -2051,6 +2055,7 @@ void fdt_fixup_bt_debug(void *blob)
 	parse_fdt_fixup("/soc/serial@78b0000/%status%?ok", blob);
 	parse_fdt_fixup("/soc/usb3@8A00000/%delete%device-power-gpio", blob);
 }
+#endif
 
 #ifdef CONFIG_IPQ_TINY
 void fdt_fixup_art_format(void *blob)
@@ -2062,11 +2067,14 @@ void fdt_fixup_art_format(void *blob)
 }
 #endif
 
+#ifndef CONFIG_CMD_DISABLE_EXECTZT
 void run_tzt(void *address)
 {
 	execute_tzt(address);
 }
+#endif
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_set_dload_warm_reset(void *blob)
 {
 	int nodeoff, ret;
@@ -2089,6 +2097,7 @@ void fdt_fixup_set_dload_warm_reset(void *blob)
 	if (ret)
 		printf("fixup_set_dload: 'dload_warm_reset' not set");
 }
+#endif
 
 #ifdef CONFIG_SMP_CMD_SUPPORT
 int is_secondary_core_off(unsigned int cpuid)
@@ -2133,22 +2142,15 @@ unsigned int get_dts_machid(unsigned int machid)
 
 void ipq_uboot_fdt_fixup(void)
 {
-	int ret, len;
-	const char *config = "config@mp05.1";
-	len = fdt_totalsize(gd->fdt_blob) + strlen(config) + 1;
-	if (gd->bd->bi_arch_number == MACH_TYPE_IPQ5018_AP_MP05_1)
+	init_config_list();
+	switch (gd->bd->bi_arch_number)
 	{
-		/*
-		* Open in place with a new length.
-		*/
-		ret = fdt_open_into(gd->fdt_blob, (void *)gd->fdt_blob, len);
-		if (ret)
-			printf("uboot-fdt-fixup: Cannot expand FDT: %s\n", fdt_strerror(ret));
-
-		ret = fdt_setprop((void *)gd->fdt_blob, 0, "config_name",
-			config, (strlen(config)+1));
-		if (ret)
-			printf("uboot-fdt-fixup: unable to set config_name(%d)\n", ret);
+		case MACH_TYPE_IPQ5018_AP_MP05_1:
+			add_config_entry("config@mp05.1");
+			add_config_entry("config-mp05.1");
+			break;
+		default:
+			add_config_list_from_fdt();
 	}
 	return;
 }
@@ -2163,6 +2165,7 @@ void sdi_disable(void)
 	qca_scm_sdi();
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_for_atf(void *blob)
 {
 	if (fdt_path_offset(blob, "/soc/dma@704000") >= 0) {
@@ -2172,3 +2175,4 @@ void fdt_fixup_for_atf(void *blob)
 				blob);
 	}
 }
+#endif

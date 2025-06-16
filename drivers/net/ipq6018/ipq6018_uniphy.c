@@ -29,6 +29,7 @@ extern int ipq_mdio_write(int mii_id,
 extern int ipq_mdio_read(int mii_id,
 		int regnum, ushort *data);
 extern void qca8075_phy_serdes_reset(u32 phy_id);
+int uniphy_cur_mode[PPE_MAX_UNIPHY_INSTANCE] = {-1, -1};
 
 void csr1_write(int phy_id, int addr, int  value)
 {
@@ -130,8 +131,15 @@ static void ppe_uniphy_qsgmii_mode_set(uint32_t uniphy_index)
 
 static void ppe_uniphy_sgmii_mode_set(uint32_t uniphy_index, uint32_t mode)
 {
-	writel(UNIPHY_MISC2_REG_SGMII_MODE, PPE_UNIPHY_BASE +
-		(uniphy_index * PPE_UNIPHY_REG_INC) + UNIPHY_MISC2_REG_OFFSET);
+	if (mode == PORT_WRAPPER_SGMII_PLUS) {
+		writel(UNIPHY_MISC2_REG_SGMII_PLUS_MODE, PPE_UNIPHY_BASE +
+			(uniphy_index * PPE_UNIPHY_REG_INC) +
+			UNIPHY_MISC2_REG_OFFSET);
+	} else {
+		writel(UNIPHY_MISC2_REG_SGMII_MODE, PPE_UNIPHY_BASE +
+			(uniphy_index * PPE_UNIPHY_REG_INC) +
+			UNIPHY_MISC2_REG_OFFSET);
+	}
 
 	writel(UNIPHY_PLL_RESET_REG_VALUE, PPE_UNIPHY_BASE +
 		(uniphy_index * PPE_UNIPHY_REG_INC) + UNIPHY_PLL_RESET_REG_OFFSET);
@@ -257,6 +265,9 @@ static void ppe_uniphy_usxgmii_mode_set(uint32_t uniphy_index)
 
 void ppe_uniphy_mode_set(uint32_t uniphy_index, uint32_t mode)
 {
+	if (uniphy_cur_mode[uniphy_index] == mode)
+		return;
+
 	switch(mode) {
 		case PORT_WRAPPER_PSGMII:
 			ppe_uniphy_psgmii_mode_set(uniphy_index);
@@ -278,8 +289,10 @@ void ppe_uniphy_mode_set(uint32_t uniphy_index, uint32_t mode)
 			ppe_uniphy_10g_r_mode_set(uniphy_index);
 			break;
 		default:
-			break;
+			return;
 	}
+
+	uniphy_cur_mode[uniphy_index] = mode;
 }
 
 void ppe_uniphy_usxgmii_autoneg_completed(uint32_t uniphy_index)

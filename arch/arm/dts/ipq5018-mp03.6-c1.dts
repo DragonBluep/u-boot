@@ -17,7 +17,7 @@
 	model ="QCA, IPQ5018-MP03.6-C1";
 	compatible = "qca,ipq5018", "qca,ipq5018-mp03.6-c1";
 	machid = <0x8040003>;
-	config_name = "config@mp03.6-c1";
+	config_name = "config@mp03.6-c1", "config-mp03.6-c1";
 
 	aliases {
 		console = "/serial@78AF000";
@@ -158,7 +158,7 @@
 	};
 
 	sdx-gpio {
-		ap2mdm = <25>;
+		ap2mdm = <26>;
 	};
 
 

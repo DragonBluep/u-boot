@@ -903,7 +903,11 @@ static int nand_load_image(cmd_tbl_t *cmdtp, nand_info_t *nand,
 
 	load_addr = addr;
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	return bootm_maybe_autostart(cmdtp, cmd);
+#else
+	return 0;
+#endif
 }
 
 static int do_nandboot(cmd_tbl_t *cmdtp, int flag, int argc,

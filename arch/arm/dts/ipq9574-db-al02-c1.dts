@@ -15,7 +15,7 @@
 #include "ipq9574-soc.dtsi"
 / {
 	machid = <0x1050001>;
-	config_name = "config@db-al02-c1";
+	config_name = "config@db-al02-c1", "config-db-al02-c1";
 
 	aliases {
 		console = "/serial@78B1000";

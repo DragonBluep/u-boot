@@ -54,12 +54,16 @@ static unsigned int msm_boot_uart_dm_init(unsigned long uart_dm_base);
 
 /* Received data is valid or not */
 static int valid_data = 0;
+#ifndef CONFIG_DISABLE_CMD_UART
 static int uart_valid_data = 0;
+#endif
 
 /* Received data */
 static unsigned int word = 0;
+#ifndef CONFIG_DISABLE_CMD_UART
 static unsigned int uart_word = 0;
 static unsigned int current_baud_rate = 0;
+#endif
 
 /**
  * msm_boot_uart_dm_init_rx_transfer - Init Rx transfer
@@ -490,6 +494,7 @@ U_BOOT_DRIVER(serial_ipq) = {
 	.flags = DM_FLAG_PRE_RELOC,
 };
 
+#ifndef CONFIG_DISABLE_CMD_UART
 /**
  * do_uartwr - transmits a string of data
  * @s: string to transmit
@@ -698,3 +703,4 @@ U_BOOT_CMD(
 	"uart write - write strings to second UART\n"
 	"uart baud_rate [rate] - show or set second UART baud rates\n"
 );
+#endif

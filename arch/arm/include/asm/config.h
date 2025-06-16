@@ -8,7 +8,9 @@
 #define _ASM_CONFIG_H_
 
 #define CONFIG_LMB
+#ifndef CONFIG_DISABLE_RAMDISK
 #define CONFIG_SYS_BOOT_RAMDISK_HIGH
+#endif
 
 #ifdef CONFIG_ARM64
 #define CONFIG_PHYS_64BIT

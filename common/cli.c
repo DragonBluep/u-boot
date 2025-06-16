@@ -137,6 +137,7 @@ int do_run(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #endif
 
 #if CONFIG_IS_ENABLED(OF_CONTROL)
+#ifndef CONFIG_REDUCE_FOOTPRINT
 bool cli_process_fdt(const char **cmdp)
 {
 	/* Allow the fdt to override the boot command */
@@ -197,6 +198,7 @@ err:
 	 */
 	hang();
 }
+#endif
 #endif /* CONFIG_IS_ENABLED(OF_CONTROL) */
 
 void cli_loop(void)

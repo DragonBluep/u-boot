@@ -127,6 +127,10 @@ int common_diskboot(cmd_tbl_t *cmdtp, const char *intf, int argc,
 	/* Loading ok, update default load address */
 	load_addr = addr;
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	return bootm_maybe_autostart(cmdtp, argv[0]);
+#else
+	return 0;
+#endif
 }
 #endif

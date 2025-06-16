@@ -172,7 +172,8 @@ void ipq_fdt_fixup_version(void *blob)
 	}
 #endif /* RPM_VERSION */
 }
-#ifdef CONFIG_IPQ_TINY
+
+#if defined (CONFIG_IPQ_TINY) && !defined(CONFIG_NAND_FLASH)
 #define		OFFSET_NOT_SPECIFIED	(~0llu)
 struct reg_cell {
 	unsigned int r0;
@@ -359,7 +360,8 @@ void ipq_fdt_fixup_mtdparts(void *blob, struct flash_node_info *ni)
 }
 #endif
 
-void ipq_fdt_mem_rsvd_fixup(void *blob)
+#ifdef CONFIG_IPQ_FDT_FIXUP
+void ipq_fdt_dload_disable_fixup(void *blob)
 {
 	u32 dload = 1;
 	int parentoff, nodeoff, ret, i;
@@ -660,6 +662,7 @@ static int ipq40xx_patch_eth_params(void *blob, unsigned long gmac_no)
 		debug("%d: unable to set property\n", ret);
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_IPQ_FDT_FIXUP
 /* setenv fdteditnum <num>   - here <num> represents number of envs to parse
@@ -832,7 +835,6 @@ void ipq_fdt_fixup(void *blob)
 			parse_fdt_fixup(s, blob);
 	}
 }
-#endif
 
 __weak void fdt_fixup_sd_ldo_gpios_toggle(void *blob)
 {
@@ -870,11 +872,6 @@ __weak void fdt_fixup_set_qca_cold_reboot_enable(void *blob)
 }
 
 __weak void fdt_fixup_for_atf(void *blob)
-{
-	return;
-}
-
-__weak void fdt_fixup_art_format(void *blob)
 {
 	return;
 }
@@ -955,6 +952,17 @@ peripheral:
 		blob);
 }
 
+__weak void fdt_fixup_auto_restart(void *blob)
+{
+	return;
+}
+#endif
+
+__weak void fdt_fixup_art_format(void *blob)
+{
+	return;
+}
+
 __weak void ipq_fdt_fixup_socinfo(void *blob)
 {
 	uint32_t cpu_type;
@@ -999,11 +1007,6 @@ __weak void ipq_fdt_fixup_socinfo(void *blob)
 	} else {
 		printf("%s: cannot get soc version\n", __func__);
 	}
-	return;
-}
-
-__weak void fdt_fixup_auto_restart(void *blob)
-{
 	return;
 }
 
@@ -1054,16 +1057,18 @@ int ft_board_setup(void *blob, bd_t *bd)
 {
 	u64 memory_start = CONFIG_SYS_SDRAM_BASE;
 	u64 memory_size = gd->ram_size;
+#ifdef CONFIG_IPQ_FDT_FIXUP
 	unsigned long gmac_no;
-	uint32_t flash_type;
 	char *s;
+#endif
+	uint32_t flash_type;
 	char *mtdparts = NULL;
 	char *addparts = NULL;
 	char parts_str[4096];
 	int len = sizeof(parts_str), ret;
 	qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
 	int activepart = 0;
-#ifdef CONFIG_IPQ_TINY
+#if defined (CONFIG_IPQ_TINY) && !defined(CONFIG_NAND_FLASH)
 	struct flash_node_info nodes[] = {
 		{ "n25q128a11", MTD_DEV_TYPE_NAND,
 				CONFIG_IPQ_SPI_NOR_INFO_IDX }
@@ -1089,7 +1094,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 	fdt_fixup_memory_banks(blob, &memory_start, &memory_size, 1);
 	ipq_fdt_fixup_version(blob);
 #ifndef CONFIG_QCA_APPSBL_DLOAD
-	ipq_fdt_mem_rsvd_fixup(blob);
+	ipq_fdt_dload_disable_fixup(blob);
 #endif
 	if (((sfi->flash_type == SMEM_BOOT_NAND_FLASH) ||
 		(sfi->flash_type == SMEM_BOOT_QSPI_NAND_FLASH))) {
@@ -1134,7 +1139,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 
 		set_mtdids();
 		debug("MTDIDS: %s\n", getenv("mtdids"));
-#ifdef CONFIG_IPQ_TINY
+#if defined (CONFIG_IPQ_TINY) && !defined(CONFIG_NAND_FLASH)
 		ipq_nor_fdt_fixup(blob, nodes);
 #else
 		ipq_fdt_fixup_mtdparts(blob, nodes);
@@ -1149,20 +1154,22 @@ int ft_board_setup(void *blob, bd_t *bd)
 		if (ret)
 			printf("%s: cannot set flash type %d\n", __func__, ret);
 	}
+	if (is_atf_enabled()) {
+		fdt_fixup_set_qca_cold_reboot_enable(blob);
+		fdt_fixup_for_atf(blob);
+	}
 
+	dcache_disable();
 	ipq_fdt_fixup_socinfo(blob);
+#ifdef CONFIG_IPQ_FDT_FIXUP
 	s = (getenv("gmacnumber"));
 	if (s) {
 		strict_strtoul(s, 16, &gmac_no);
 		if (gmac_no > 2 && gmac_no < 6)
 			ipq40xx_patch_eth_params(blob, gmac_no);
 	}
-	dcache_disable();
-#ifdef CONFIG_IPQ_FDT_FIXUP
 	ipq_fdt_fixup(blob);
-#endif
 	fdt_fixup_flash(blob);
-	fdt_fixup_ethernet(blob);
 	ipq_fdt_fixup_usb_device_mode(blob);
 	fdt_fixup_auto_restart(blob);
 	fdt_fixup_sd_ldo_gpios_toggle(blob);
@@ -1176,14 +1183,10 @@ int ft_board_setup(void *blob, bd_t *bd)
 		fdt_fixup_set_dload_warm_reset(blob);
 	s = getenv("dload_dis");
 	if ((s != NULL) && (s[0] != '\0'))
-		ipq_fdt_mem_rsvd_fixup(blob);
+		ipq_fdt_dload_disable_fixup(blob);
 	s = getenv("qce_fixed_key");
 	if (s)
 		fdt_fixup_set_qce_fixed_key(blob);
-	if (is_atf_enabled()) {
-		fdt_fixup_set_qca_cold_reboot_enable(blob);
-		fdt_fixup_for_atf(blob);
-	}
 	s = getenv("bt_debug");
 	if (s) {
 		fdt_fixup_bt_debug(blob);
@@ -1192,6 +1195,9 @@ int ft_board_setup(void *blob, bd_t *bd)
 #ifdef CONFIG_IPQ_BT_SUPPORT
 	fdt_fixup_bt_running(blob);
 #endif
+	fdt_fixup_sdx65_gpio(blob);
+#endif
+
 	/*
 	|| This features fixup compressed_art in
 	|| dts if its 16M profile build.
@@ -1202,7 +1208,7 @@ int ft_board_setup(void *blob, bd_t *bd)
 	board_mmc_deinit();
 #endif
 
-	fdt_fixup_sdx65_gpio(blob);
+	fdt_fixup_ethernet(blob);
 	return 0;
 }
 

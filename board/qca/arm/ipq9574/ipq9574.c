@@ -33,7 +33,31 @@
 #define DLOAD_MAGIC_COOKIE	0x10
 #define DLOAD_DISABLED		0x40
 
+#define LINUX6_1_NAND_DTS "/soc@0/nand@79b0000/"
+#define LINUX6_1_MMC_DTS "/soc@0/mmc@7804000/"
+#define STATUS_OK "status%?okay"
+#define STATUS_DISABLED "status%?disabled"
+
 DECLARE_GLOBAL_DATA_PTR;
+
+unsigned long fuse_addr[FUSE_CNT] = {
+		0x000A00C0,
+		0x000A00C4,
+		0x000A00D8,
+		0x000A00DC,
+		0x000A00E0,
+		0x000A00E4,
+		0x000A00E8,
+		0x000A00EC,
+		0x000A00F0,
+		0x000A00F4,
+		0x000A00F8,
+		0x000A00FC,
+		0x000A0100,
+		0x000A0104,
+		0x000A0108,
+		0x000A010C,
+};
 
 struct sdhci_host mmc_host;
 extern int ipq9574_edma_init(void *cfg);
@@ -43,6 +67,24 @@ unsigned int qpic_frequency = 0, qpic_phase = 0;
 static int aq_phy_initialised = 0;
 
 extern	int qca_scm_dpr(u32, u32, void *, size_t);
+
+void fdt_fixup_flash(void *blob)
+{
+	uint32_t flash_type = SMEM_BOOT_NO_FLASH;
+	int nand_nodeoff = fdt_path_offset(blob, LINUX6_1_NAND_DTS);
+	int mmc_nodeoff = fdt_path_offset(blob, LINUX6_1_MMC_DTS);
+
+	get_current_flash_type(&flash_type);
+	if (flash_type == SMEM_BOOT_NORPLUSEMMC ||
+		flash_type == SMEM_BOOT_MMC_FLASH ) {
+		if(nand_nodeoff >= 0)
+			parse_fdt_fixup(LINUX6_1_NAND_DTS"%"STATUS_DISABLED,
+					blob);
+		if(mmc_nodeoff >= 0)
+			parse_fdt_fixup(LINUX6_1_MMC_DTS"%"STATUS_OK, blob);
+	}
+	return;
+}
 
 void qca_serial_init(struct ipq_serial_platdata *plat)
 {
@@ -84,6 +126,7 @@ void board_nand_init(void)
 	gpio_node = fdt_path_offset(gd->fdt_blob, "/spi/spi_gpio");
 	if (gpio_node >= 0) {
 		qca_gpio_init(gpio_node);
+		spi_clock_init(0);
 		ipq_spi_init(CONFIG_IPQ_SPI_NOR_INFO_IDX);
 	}
 #endif
@@ -1357,7 +1400,7 @@ unsigned int get_dts_machid(unsigned int machid)
 		case MACH_TYPE_IPQ9574_AP_AL02_C6:
 			return MACH_TYPE_IPQ9574_AP_AL02_C1;
 		case MACH_TYPE_IPQ9574_AP_AL02_C11:
-			return MACH_TYPE_IPQ9574_AP_AL02_C13;
+			return MACH_TYPE_IPQ9574_AP_AL02_C4;
 		case MACH_TYPE_IPQ9574_AP_AL02_C12:
                         return MACH_TYPE_IPQ9574_AP_AL02_C4;
 		case MACH_TYPE_IPQ9574_AP_AL02_C14:
@@ -1366,6 +1409,8 @@ unsigned int get_dts_machid(unsigned int machid)
                         return MACH_TYPE_IPQ9574_AP_AL02_C1;
 		case MACH_TYPE_IPQ9574_AP_AL02_C16:
                         return MACH_TYPE_IPQ9574_AP_AL02_C13;
+		case MACH_TYPE_IPQ9574_AP_AL02_C20:
+			return MACH_TYPE_IPQ9574_AP_AL02_C13;
 		case MACH_TYPE_IPQ9574_AP_AL03_C2:
 			return MACH_TYPE_IPQ9574_AP_AL03_C1;
 		default:
@@ -1375,55 +1420,65 @@ unsigned int get_dts_machid(unsigned int machid)
 
 void ipq_uboot_fdt_fixup(void)
 {
-	int ret, len;
-	char *config = NULL;
-
+	init_config_list();
 	switch (gd->bd->bi_arch_number)
 	{
 		case MACH_TYPE_IPQ9574_EMULATION:
-			config = "config@emulation-fbc";
+			add_config_entry("config@emulation-fbc");
+			add_config_entry("config-emulation-fbc");
 			break;
 		case MACH_TYPE_IPQ9574_AP_AL02_C5:
-			config = "config@al02-c5";
+			add_config_entry("config@al02-c5");
+			add_config_entry("config-al02-c5");
 			break;
 		case MACH_TYPE_IPQ9574_AP_AL02_C6:
-			config = "config@al02-c6", "config@rdp449";
+			add_config_entry("config@al02-c6");
+			add_config_entry("config-al02-c6");
+			add_config_entry("config@rdp449");
+			add_config_entry("config-rdp449");
 			break;
 		case MACH_TYPE_IPQ9574_AP_AL02_C11:
-			config = "config@al02-c11", "config@rdp467";
+			add_config_entry("config@al02-c11");
+			add_config_entry("config-al02-c11");
+			add_config_entry("config@rdp455");
+			add_config_entry("config-rdp455");
 			break;
 		case MACH_TYPE_IPQ9574_AP_AL02_C12:
-                        config = "config@al02-c12", "config@rdp455";
-                        break;
+			add_config_entry("config@al02-c12");
+			add_config_entry("config-al02-c12");
+			add_config_entry("config@rdp455");
+			add_config_entry("config-rdp455");
+			break;
 		case MACH_TYPE_IPQ9574_AP_AL02_C14:
-                        config = "config@al02-c14";
-                        break;
+			add_config_entry("config-al02-c14");
+			add_config_entry("config@al02-c14");
+			break;
 		case MACH_TYPE_IPQ9574_AP_AL02_C15:
-			config = "config@al02-c15", "config@rdp457";
+			add_config_entry("config@al02-c15");
+			add_config_entry("config-al02-c15");
+			add_config_entry("config@rdp457");
+			add_config_entry("config-rdp457");
 			break;
 		case MACH_TYPE_IPQ9574_AP_AL02_C16:
-			config = "config@al02-c16", "config@rdp456";
+			add_config_entry("config@al02-c16");
+			add_config_entry("config-al02-c16");
+			add_config_entry("config@rdp456");
+			add_config_entry("config-rdp456");
+			break;
+		case MACH_TYPE_IPQ9574_AP_AL02_C20:
+			add_config_entry("config@al02-c20");
+			add_config_entry("config-al02-c20");
+			add_config_entry("config@rdp467");
+			add_config_entry("config-rdp467");
 			break;
 		case MACH_TYPE_IPQ9574_AP_AL03_C2:
-			config = "config@al03-c2", "config@rdp458";
+			add_config_entry("config@al03-c2");
+			add_config_entry("config-al03-c2");
+			add_config_entry("config@rdp458");
+			add_config_entry("config-rdp458");
 			break;
-	}
-
-	if (config != NULL)
-	{
-		len = fdt_totalsize(gd->fdt_blob) + strlen(config) + 1;
-
-		/*
-		 * Open in place with a new length.
-		*/
-		ret = fdt_open_into(gd->fdt_blob, (void *)gd->fdt_blob, len);
-		if (ret)
-			 printf("uboot-fdt-fixup: Cannot expand FDT: %s\n", fdt_strerror(ret));
-
-		ret = fdt_setprop((void *)gd->fdt_blob, 0, "config_name",
-				config, (strlen(config)+1));
-		if (ret)
-			printf("uboot-fdt-fixup: unable to set config_name(%d)\n", ret);
+		default:
+			add_config_list_from_fdt();
 	}
 	return;
 }
@@ -1475,7 +1530,7 @@ int do_dpr(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		printf("%s: Error in DPR Processing (%d, %d)\n",
 			__func__, ret, dpr_status);
 	} else {
-		printf("DPR Process sucessful\n");
+		printf("DPR Process Successful\n");
 	}
 	return ret;
 }

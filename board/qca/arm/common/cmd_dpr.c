@@ -60,7 +60,7 @@ int do_dpr(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		printf("%s: Error in DPR Processing (%d, %d)\n",
 			__func__, ret, dpr_status);
 	} else {
-		printf("DPR Process sucessful\n");
+		printf("DPR Process Successful\n");
 	}
 	return ret;
 }

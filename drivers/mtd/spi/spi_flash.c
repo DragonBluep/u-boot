@@ -31,6 +31,12 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+static u32 spi_fsize;
+
+u32 get_spi_flash_size(void) {
+	return spi_fsize;
+}
+
 static void spi_flash_addr(struct spi_flash *flash, u32 addr, u8 *cmd)
 {
 	/* cmd[0] is actual command */
@@ -1324,7 +1330,7 @@ do_generic_probe:
 		return -EINVAL;
 	}
 #endif
-
+	spi_fsize = flash->size;
 #ifdef CONFIG_SPI_NAND
 print_sf_info:
 #endif

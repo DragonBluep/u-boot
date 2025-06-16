@@ -1,7 +1,9 @@
 obj-y := cmd_bootqca.o
 obj-y += cmd_blowsecfuse.o
 obj-y += cmd_sec_auth.o
+ifndef CONFIG_CMD_DISABLE_EXECTZT
 obj-y += cmd_exectzt.o
+endif
 obj-$(CONFIG_IPQ_TZT) += cmd_tzt.o
 obj-$(CONFIG_SMP_CMD_SUPPORT) += cmd_runmulticore.o
 obj-y += fdt_info.o

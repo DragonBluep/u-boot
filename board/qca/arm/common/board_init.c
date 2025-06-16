@@ -45,6 +45,10 @@ extern struct sdhci_host mmc_host;
 #endif
 #endif
 
+#ifdef CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+struct config_list config_entries;
+#endif
+
 env_t *env_ptr;
 char *env_name_spec;
 int (*saveenv)(void);
@@ -120,6 +124,32 @@ __weak int bring_sec_core_up(unsigned int cpuid, unsigned int entry, unsigned in
 	return CMD_RET_SUCCESS;
 }
 #endif
+
+#define SECURE_BOARD_MAGIC	0x5ECB001
+
+void update_board_type(void)
+{
+	int ret;
+	uint8_t buf = 0;
+	qca_smem_flash_info_t *sfi = &qca_smem_flash_info;
+
+	if(SMEM_BOOT_NO_FLASH == sfi->flash_type)
+		return;
+
+	ret = qca_scm_call(SCM_SVC_FUSE, QFPROM_IS_AUTHENTICATE_CMD, &buf,
+								sizeof(char));
+
+	if (ret) {
+		printf("%s: scm call failed. ret = %d\n", __func__, ret);
+		printf("%s: Failed\n", __func__);
+		gd->board_type = 0;
+		return;
+	}
+
+	gd->board_type = (buf == 1) ? SECURE_BOARD_MAGIC : 0;
+
+	return;
+}
 
 int board_init(void)
 {
@@ -262,6 +292,9 @@ int board_init(void)
 	 * serial init after relocation
 	 */
 	uart_wait_tx_empty();
+
+	update_board_type();
+
 	return 0;
 }
 
@@ -387,10 +420,10 @@ int board_fix_fdt(void *rw_fdt_blob)
 #ifdef CONFIG_FLASH_PROTECT
 void board_flash_protect(void)
 {
+#ifdef CONFIG_QCA_MMC
 	int num_part;
 	int i;
 	int ret;
-#ifdef CONFIG_QCA_MMC
 	block_dev_desc_t *mmc_dev;
 	disk_partition_t info;
 
@@ -569,3 +602,50 @@ __weak int smem_read_cpu_count()
 {
 	return -1;
 }
+
+#ifdef CONFIG_LIST_OF_CONFIG_NAMES_SUPPORT
+void add_config_entry(const char *config)
+{
+	if (strlen(config) < CONFIG_NAME_MAX_LEN) {
+		 if (config_entries.no_of_entries < CONFIG_NAME_MAX_ENTRIES)
+			strlcpy(config_entries.entry
+					[config_entries.no_of_entries++],
+					config, CONFIG_NAME_MAX_LEN);
+		else
+			printf("add config entry failed ... \n");
+	} else {
+		printf("config: %s exceeds max len(%d) ...\n",
+						config,
+						CONFIG_NAME_MAX_LEN);
+	}
+}
+
+void init_config_list(void)
+{
+	memset(&config_entries, 0, sizeof(config_entries));
+}
+
+void add_config_list_from_fdt(void)
+{
+	int i, strings_count;
+	const char *config = NULL;
+
+	strings_count = fdt_count_strings(gd->fdt_blob, 0,
+						"config_name");
+	if (!strings_count) {
+		printf("Failed to get config_name\n");
+		return;
+	}
+
+	if (strings_count > CONFIG_NAME_MAX_ENTRIES) {
+		printf("config_name entries exceeds max len\n");
+		return;
+	}
+
+	for (i = 0; i < strings_count; i++) {
+		fdt_get_string_index(gd->fdt_blob, 0,
+			"config_name", i, &config);
+		add_config_entry(config);
+	}
+}
+#endif

@@ -453,6 +453,7 @@ void ipq_fdt_fixup_socinfo(void *blob)
 	}
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_sd_ldo_gpios_toggle(void *blob)
 {
 	int noff;
@@ -542,6 +543,7 @@ void ipq_fdt_fixup_usb_device_mode(void *blob)
 	}
 	return;
 }
+#endif
 
 void set_flash_secondary_type(qca_smem_flash_info_t * smem)
 {
@@ -722,6 +724,7 @@ int smem_read_cpu_count()
 	return -1;
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_cpus_node(void *blob)
 {
 	int numcpus;
@@ -771,6 +774,7 @@ void fdt_fixup_cpus_node(void *blob)
 	}
 	return;
 }
+#endif
 
 void ipq_uboot_fdt_fixup(void)
 {

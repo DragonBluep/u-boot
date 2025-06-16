@@ -259,6 +259,7 @@ bool armv7_boot_nonsec(void)
 }
 #endif
 
+#ifndef CONFIG_DISABLE_KERNEL64
 struct aarch64_hdr {
 	u32 code0; /* Executable code */
 	u32 code1; /* Executable code */
@@ -273,6 +274,7 @@ struct aarch64_hdr {
 };
 #define AARCH64_LINUX_MAGIC 0x644d5241
 #define TEST_AARCH64(ptr) (ptr->magic == AARCH64_LINUX_MAGIC) ? true : false
+#endif
 
 /* Subcommand: GO */
 static void boot_jump_linux(bootm_headers_t *images, int flag)
@@ -323,9 +325,11 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 	else
 		r2 = gd->bd->bi_boot_params;
 
+#ifndef CONFIG_DISABLE_KERNEL64
 	if (TEST_AARCH64(((struct aarch64_hdr *)kernel_entry))) {
 		jump_kernel64(kernel_entry, images->ft_addr);
 	} else {
+#endif
 		if (!fake) {
 #ifdef CONFIG_ARMV7_NONSEC
 			if (armv7_boot_nonsec()) {
@@ -336,7 +340,9 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 #endif
 				kernel_entry(0, machid, r2);
 		}
+#ifndef CONFIG_DISABLE_KERNEL64
 	}
+#endif
 #endif
 }
 
@@ -363,7 +369,9 @@ int do_bootm_linux(int flag, int argc, char * const argv[],
 		return 0;
 	}
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	boot_prep_linux(images);
+#endif
 	boot_jump_linux(images, flag);
 	return 0;
 }

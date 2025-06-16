@@ -18,6 +18,7 @@
 #include <exports.h>
 #include <fdtdec.h>
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 /**
  * fdt_getprop_u32_default_node - Return a node's property or a default
  *
@@ -71,6 +72,7 @@ u32 fdt_getprop_u32_default(const void *fdt, const char *path,
 
 	return fdt_getprop_u32_default_node(fdt, off, 0, prop, dflt);
 }
+#endif
 
 /**
  * fdt_find_and_setprop: Find a node and set it's property
@@ -333,6 +335,7 @@ void do_fixup_by_path(void *fdt, const char *path, const char *prop,
 			path, prop, fdt_strerror(rc));
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 void do_fixup_by_path_u32(void *fdt, const char *path, const char *prop,
 			  u32 val, int create)
 {
@@ -394,6 +397,7 @@ void do_fixup_by_compat_u32(void *fdt, const char *compat,
 	fdt32_t tmp = cpu_to_fdt32(val);
 	do_fixup_by_compat(fdt, compat, prop, &tmp, 4, create);
 }
+#endif
 
 /*
  * fdt_pack_reg - pack address and size array into the "reg"-suitable stream
@@ -570,6 +574,7 @@ int fdt_shrink_to_minimum(void *blob)
 	return actualsize;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 #ifdef CONFIG_PCI
 #define CONFIG_SYS_PCI_NR_INBOUND_WIN 4
 
@@ -716,6 +721,7 @@ int fdt_fixup_nor_flash_size(void *blob)
 	return 0;
 }
 #endif
+#endif
 
 int fdt_increase_size(void *fdt, int add_len)
 {
@@ -789,6 +795,7 @@ int fdt_del_partitions(void *blob, int parent_offset)
 	return 0;
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int fdt_node_set_part_info(void *blob, int parent_offset,
 			   struct mtd_device *dev)
 {
@@ -816,6 +823,9 @@ int fdt_node_set_part_info(void *blob, int parent_offset,
 		int newoff;
 
 		part = list_entry(pentry, struct part_info, link);
+
+		if (part->offset + part->size > dev->id->size)
+			continue;
 
 		debug("%2d: %-20s0x%08llx\t0x%08llx\t%d\n",
 			part_num, part->name, part->size,
@@ -1622,3 +1632,4 @@ int fdt_fixup_display(void *blob, const char *path, const char *display)
 	}
 	return toff;
 }
+#endif

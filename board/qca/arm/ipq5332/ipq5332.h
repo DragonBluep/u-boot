@@ -43,6 +43,20 @@ extern const add_node_t add_fdt_node[];
 #define DLOAD_DISABLED				0x40
 #define DLOAD_BITS				0xFF
 
+/* TME  DUMP */
+
+#ifndef DUMP_TME_LOG
+#define DUMP_TME_LOG			1
+#endif
+
+#ifndef	TME_LOG_DUMP_FEATURE_ID
+#define TME_LOG_DUMP_FEATURE_ID		0x7
+#endif
+
+#ifndef TME_LOG_DUMP_FEATURE_VERSION
+#define TME_LOG_DUMP_FEATURE_VERSION	0x401000
+#endif
+
 /* USB Registers */
 #define TCSR_USB_PCIE_SEL			0x01947540
 #define TCSR_USB_PCIE_SEL_USB			0x1
@@ -87,14 +101,15 @@ extern const add_node_t add_fdt_node[];
 #define USB2PHY_USB_PHY_M31_XCFGI_1		0xBC
 #define USB2PHY_USB_PHY_M31_XCFGI_4		0xC8
 #define USB2PHY_USB_PHY_M31_XCFGI_5		0xCC
+#define USB2PHY_USB_PHY_M31_XCFGI_9		0xDC
 #define USB2PHY_USB_PHY_M31_XCFGI_11		0xE4
 
 #define USB2_0_TX_ENABLE			BIT(2)
-#define HSTX_SLEW_RATE_565PS			3
+#define HSTX_SLEW_RATE_400PS			7
 #define PLL_CHARGING_PUMP_CURRENT_35UA		(3 << 3)
 #define ODT_VALUE_38_02_OHM			(3 << 6)
-#define ODT_VALUE_45_02_OHM			BIT(2)
 #define HSTX_PRE_EMPHASIS_LEVEL_0_55MA		(1)
+#define HSTX_CURRENT_17_1MA_385MV		BIT(1)
 
 #define UTMI_PHY_OVERRIDE_EN			BIT(1)
 #define SLEEPM					BIT(1)
@@ -299,6 +314,13 @@ typedef enum {
 	SMEM_LAST_VALID_TYPE = SMEM_RUNTIME_FAILSAFE_INFO,
 	SMEM_MAX_SIZE = SMEM_RUNTIME_FAILSAFE_INFO + 1,
 } smem_mem_type_t;
+
+#define FUSE_CNT	8
+struct fuse_payload {
+	u32 fuse_addr;
+	u32 lsb_val;
+	u32 msb_val;
+};
 
 /*
  * function declaration

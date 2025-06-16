@@ -418,6 +418,7 @@ void reset_cpu(unsigned long a)
 }
 
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 int sdx65_attached(void);
 
 int get_ap2mdm_gpio(void)
@@ -455,6 +456,7 @@ void indicate_sdx_device(void)
 	}
 
 }
+#endif
 
 void reset_board(void)
 {
@@ -797,6 +799,7 @@ void board_nand_init(void)
 	gpio_node = fdt_path_offset(gd->fdt_blob, "/spi/spi_gpio");
 	if (gpio_node >= 0) {
 		qca_gpio_init(gpio_node);
+		spi_clock_init(0);
 	} else {
 		/* Setting default values */
 		for (i = 0; i < gboard_param.spi_nor_cfg.gpio_count; i++)
@@ -1006,6 +1009,7 @@ void board_pci_deinit()
 }
 #endif
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 int sdx65_attached(void)
 {
 	const char *sdx65_env = getenv("x65_attached");
@@ -1070,6 +1074,7 @@ void fdt_fixup_sdx65_gpio(void *blob)
 	else if (fdt_path_offset(blob, "/soc/pinctrl@1000000/pcie_sdx_pinmux/mdm2ap_e911_status") >= 0)
 		parse_fdt_fixup("/soc/pinctrl@1000000/pcie_sdx_pinmux/mdm2ap_e911_status/%pins%?gpio22", blob);
 }
+#endif
 
 #ifdef CONFIG_USB_XHCI_IPQ
 void board_usb_deinit(int id)
@@ -1376,47 +1381,36 @@ unsigned int get_dts_machid(unsigned int machid)
 
 void ipq_uboot_fdt_fixup(void)
 {
-	int ret, len;
-	char *config = NULL;
-
+	init_config_list();
 	switch (gd->bd->bi_arch_number)
 	{
 		case MACH_TYPE_IPQ807x_AP_HK01_C3:
-			config = "config@hk01.c3";
+			add_config_entry("config@hk01.c3");
+			add_config_entry("config-hk01.c3");
 			break;
 		case MACH_TYPE_IPQ807x_AP_HK01_C6:
-			config = "config@hk01.c6";
+			add_config_entry("config@hk01.c6");
+			add_config_entry("config-hk01.c6");
 			break;
 		case MACH_TYPE_IPQ807x_AP_HK12_C1:
-			config = "config@hk12";
+			add_config_entry("config@hk12");
+			add_config_entry("config-hk12");
 			break;
 		case MACH_TYPE_IPQ807x_AP_AC02:
-			config = "config@ac02";
+			add_config_entry("config@ac02");
+			add_config_entry("config-ac02");
 			break;
 		case MACH_TYPE_IPQ807x_AP_OAK03:
-			config = "config@oak03";
+			add_config_entry("config@oak03");
+			add_config_entry("config-oak03");
 			break;
-	}
-
-	if (config != NULL)
-	{
-		len = fdt_totalsize(gd->fdt_blob) + strlen(config) + 1;
-
-		/*
-		 * Open in place with a new length.
-		*/
-		ret = fdt_open_into(gd->fdt_blob, (void *)gd->fdt_blob, len);
-		if (ret)
-			 printf("uboot-fdt-fixup: Cannot expand FDT: %s\n", fdt_strerror(ret));
-
-		ret = fdt_setprop((void *)gd->fdt_blob, 0, "config_name",
-				config, (strlen(config)+1));
-		if (ret)
-			printf("uboot-fdt-fixup: unable to set config_name(%d)\n", ret);
+		default:
+			add_config_list_from_fdt();
 	}
 	return;
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void ipq_fdt_fixup_usb_device_mode(void *blob)
 {
 	int nodeoff, ret, node;
@@ -1482,10 +1476,12 @@ void fdt_fixup_auto_restart(void *blob)
 	}
 	return;
 }
+#endif
 
 #define TCSR_CPR	0x0193d008 /* TCSR_TZ_WONCE_2 */
 #define BM(lsb, msb)            ((BIT(msb) - BIT(lsb)) + BIT(msb))
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_cpr(void *blob)
 {
 	int node, subnode, phandle;
@@ -1700,6 +1696,7 @@ void fdt_fixup_set_qce_fixed_key(void *blob)
 		printf("qce_crypto: 'qce,use_fixed_hw_key' property no set");
 
 }
+#endif
 
 void set_flash_secondary_type(qca_smem_flash_info_t *smem)
 {
@@ -1840,10 +1837,12 @@ int bring_sec_core_up(unsigned int cpuid, unsigned int entry, unsigned int arg)
 	return 0;
 }
 
+#ifndef CONFIG_CMD_DISABLE_EXECTZT
 void run_tzt(void *address)
 {
 	execute_tzt(address);
 }
+#endif
 
 void sdi_disable(void)
 {

@@ -15,7 +15,7 @@
 #include "ipq9574-db-al02-c1.dts"
 / {
 	machid = <0x1050201>;
-	config_name = "config@db-al02-c3";
+	config_name = "config@db-al02-c3", "config-db-al02-c3";
 
 	aliases {
 		i2c0 = "/i2c@78B9000";

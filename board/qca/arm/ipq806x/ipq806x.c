@@ -568,10 +568,12 @@ void board_pci_deinit()
 	return ;
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void ipq_fdt_fixup_usb_device_mode(void *blob)
 {
 	return;
 }
+#endif
 
 void board_mmc_deinit(void)
 {

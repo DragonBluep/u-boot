@@ -15,7 +15,7 @@
 #include "ipq9574-db-al01-c1.dts"
 / {
 	machid = <0x1050100>;
-	config_name = "config@db-al01-c2";
+	config_name = "config@db-al01-c2", "config-db-al01-c2";
 
 	aliases {
 		mmc = "/sdhci@7804000";

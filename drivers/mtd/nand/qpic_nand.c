@@ -302,6 +302,22 @@ static struct qpic_serial_nand_params qpic_serial_nand_tbl[] = {
 		.name = "W25N02KWZEIR",
 	},
 	{
+		.id = { 0xef, 0xba, 0x23 },
+		.page_size = 2048,
+		.erase_blk_size = 0x00020000,
+		.pgs_per_blk = 64,
+		.no_of_blocks = 4096,
+		.spare_size = 128,
+		.density = 0x20000000,
+		.otp_region = 0x2000,
+		.no_of_addr_cycle = 0x3,
+		.num_bits_ecc_correctability = 8,
+		.timing_mode_support = 0,
+		.quad_mode = true,
+		.check_quad_config = false,
+		.name = "W25N04KWZEIR",
+	},
+	{
 		.id = { 0xc2, 0x92 },
 		.page_size = 2048,
 		.erase_blk_size = 0x00020000,
@@ -371,11 +387,11 @@ static struct qpic_serial_nand_params qpic_serial_nand_tbl[] = {
 		.erase_blk_size = 0x00020000,
 		.pgs_per_blk = 64,
 		.no_of_blocks = 2048,
-		.spare_size = 160,
-		.density = 0x08000000,
+		.spare_size = 128,
+		.density = 0x10000000,
 		.otp_region = 0x2000,
 		.no_of_addr_cycle = 0x3,
-		.num_bits_ecc_correctability = 4,
+		.num_bits_ecc_correctability = 8,
 		.timing_mode_support = 0,
 		.quad_mode = true,
 		.check_quad_config = true,
@@ -387,7 +403,7 @@ static struct qpic_serial_nand_params qpic_serial_nand_tbl[] = {
 		.erase_blk_size = 0x00040000,
 		.pgs_per_blk = 64,
 		.no_of_blocks = 2048,
-		.spare_size = 160,
+		.spare_size = 256,
 		.density = 0x20000000,
 		.otp_region = 0x2000,
 		.no_of_addr_cycle = 0x3,
@@ -2494,7 +2510,7 @@ static const struct nand_flash_dev *flash_get_dev(uint8_t dev_id)
 {
 	int i;
 
-	for (i = 0; nand_flash_ids[i].id; i++) {
+	for (i = 0; nand_flash_ids[i].name != NULL; i++) {
 		if (nand_flash_ids[i].dev_id == dev_id)
 			return &nand_flash_ids[i];
 	}
@@ -2833,7 +2849,7 @@ qpic_nand_read_page(struct mtd_info *mtd, uint32_t page,
 	uint32_t i;
 	int nand_ret = NANDC_RESULT_SUCCESS;
 	uint8_t flags = 0;
-	uint32_t *cmd_list_temp = NULL;
+	struct cmd_element *cmd_list_temp = NULL;
 	uint16_t data_bytes;
 	uint16_t ud_bytes_in_last_cw;
 	uint16_t oob_bytes;
@@ -3010,7 +3026,7 @@ qpic_nand_read_page(struct mtd_info *mtd, uint32_t page,
 				   (uint32_t)((addr_t)&(stats[i].flash_sts)),
 				   CE_READ_TYPE);
 
-		cmd_list_temp = (uint32_t *)cmd_list_ptr;
+		cmd_list_temp = cmd_list_ptr;
 
 		cmd_list_ptr++;
 
@@ -3070,8 +3086,9 @@ qpic_nand_read_page(struct mtd_info *mtd, uint32_t page,
 	qpic_nand_wait_for_data(DATA_PRODUCER_PIPE_INDEX);
 
 #if !defined(CONFIG_SYS_DCACHE_OFF)
-	flush_dcache_range((unsigned long)flash_sts,
-			   (unsigned long)flash_sts + sizeof(flash_sts));
+	flush_dcache_range((unsigned long)stats,
+			   (unsigned long)stats +
+				(QPIC_NAND_MAX_CWS_IN_PAGE * sizeof(*stats)));
 	flush_dcache_range((unsigned long)buffer_sts,
 			   (unsigned long)buffer_sts + sizeof(buffer_sts));
 	flush_dcache_range((unsigned long)buffer_st,

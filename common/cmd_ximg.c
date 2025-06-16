@@ -144,6 +144,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 		if (!fit_image_check_comp(fit_hdr, noffset, IH_COMP_NONE)
 		    && (argc < 4)) {
 			printf("Must specify load address for %s command "
@@ -151,6 +152,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 				cmdtp->name);
 			return 1;
 		}
+#endif
 
 		/* verify integrity */
 		if (verify) {
@@ -167,11 +169,15 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 
+#ifdef CONFIG_REDUCE_FOOTPRINT
+		comp = IH_COMP_NONE;
+#else
 		if (fit_image_get_comp(fit_hdr, noffset, &comp)) {
 			puts("Could not find script subimage "
 				"compression type\n");
 			return 1;
 		}
+#endif
 
 		data = (ulong)fit_data;
 		len = (ulong)fit_len;

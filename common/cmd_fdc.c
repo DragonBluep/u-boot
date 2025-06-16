@@ -742,7 +742,11 @@ int do_fdcboot (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	/* Loading ok, update default load address */
 	load_addr = addr;
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 	return bootm_maybe_autostart(cmdtp, argv[0]);
+#else
+	return 0;
+#endif
 }
 
 U_BOOT_CMD(

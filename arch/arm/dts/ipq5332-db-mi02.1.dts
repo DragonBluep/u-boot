@@ -17,16 +17,14 @@
 #include "ipq5332-soc.dtsi"
 / {
 	machid = <0x1060003>;
-	config_name = "config@db-mi02.1";
+	config_name = "config@db-mi02.1", "config-db-mi02.1";
 
 	aliases {
 		console = "/serial@78AF000";
 		nand = "/nand-controller@79B0000";
 		mmc = "/sdhci@7804000";
 		usb0 = "/xhci@8a00000";
-		pci0 = "/pci@20000000";
 		pci1 = "/pci@18000000";
-		pci2 = "/pci@10000000";
 		i2c0 = "/i2c@78B6000";
 	};
 
@@ -150,19 +148,6 @@
 		};
 	};
 
-	pci0: pci@20000000 {
-		status = "ok";
-		perst_gpio = <38>;
-		lane = <1>;
-		pci_gpio {
-			pci_rst {
-				gpio = <38>;
-				pull = <GPIO_PULL_UP>;
-				oe = <GPIO_OE_ENABLE>;
-			};
-		};
-	};
-
 	pci1: pci@18000000 {
 		status = "ok";
 		perst_gpio = <47>;
@@ -176,22 +161,11 @@
 		};
 	};
 
-	pci2: pci@10000000 {
-		status = "ok";
-		perst_gpio = <44>;
-		lane = <1>;
-		pci_gpio {
-			pci_rst {
-				gpio = <44>;
-				pull = <GPIO_PULL_UP>;
-				oe = <GPIO_OE_ENABLE>;
-			};
-		};
-	};
-
 	ess-switch {
 		switch_mac_mode0 = <PORT_WRAPPER_10GBASE_R>;
 		switch_mac_mode1 = <PORT_WRAPPER_10GBASE_R>;
+		sfp_gpio = <15 24>;
+		sfp_gpio_cnt = <2>;
 
 		port_phyinfo {
 			port@0 {

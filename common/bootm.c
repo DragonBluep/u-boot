@@ -40,6 +40,7 @@
 #ifndef USE_HOSTCC
 
 extern void board_usb_deinit(int id);
+extern void eth_cleanup(void);
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -112,6 +113,12 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 #endif
 #if defined(CONFIG_FIT)
 	case IMAGE_FORMAT_FIT:
+#ifdef CONFIG_REDUCE_FOOTPRINT
+		images.os.type = IH_TYPE_KERNEL;
+		images.os.comp = IH_COMP_LZMA;
+		images.os.os = IH_OS_LINUX;
+		images.os.arch = IH_ARCH_ARM;
+#else
 		if (fit_image_get_type(images.fit_hdr_os,
 				       images.fit_noffset_os,
 				       &images.os.type)) {
@@ -141,6 +148,7 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 			puts("Can't get image ARCH!\n");
 			return 1;
 		}
+#endif
 
 		images.os.end = fit_get_end(images.fit_hdr_os);
 
@@ -227,7 +235,7 @@ static int bootm_find_os(cmd_tbl_t *cmdtp, int flag, int argc,
 int bootm_find_images(int flag, int argc, char * const argv[])
 {
 	int ret;
-
+#ifndef CONFIG_DISABLE_RAMDISK
 	/* find ramdisk */
 	ret = boot_get_ramdisk(argc, argv, &images, IH_INITRD_ARCH,
 			       &images.rd_start, &images.rd_end);
@@ -235,6 +243,7 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 		puts("Ramdisk image is corrupt or invalid\n");
 		return 1;
 	}
+#endif
 
 #if defined(CONFIG_OF_LIBFDT)
 	/* find flattened device tree */
@@ -244,7 +253,7 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 		puts("Could not find a valid device tree\n");
 		return 1;
 	}
-	set_working_fdt_addr((ulong)images.ft_addr);
+	setenv_hex("fdtaddr", (ulong)images.ft_addr);
 #endif
 
 #if defined(CONFIG_FIT)
@@ -442,7 +451,7 @@ int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 		bootstage_error(BOOTSTAGE_ID_DECOMP_IMAGE);
 		return err;
 	}
-	flush_cache(load, (*load_end - load) * sizeof(ulong));
+	flush_cache(load, *load_end - load);
 
 	debug("   %s loaded at 0x%08lx, end = 0x%08lx\n",
 	      genimg_get_type_name(os.type), load, *load_end);
@@ -718,6 +727,11 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		for (i = 0; i < CONFIG_USB_MAX_CONTROLLER_COUNT; i++)
 			board_usb_deinit(i);
 #endif
+		/*
+		 * Edma cleanup
+		 */
+		eth_cleanup();
+
 		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_GO,
 				images, boot_fn);
 	}
@@ -914,6 +928,7 @@ void memmove_wd(void *to, void *from, size_t len, ulong chunksz)
 	memmove(to, from, len);
 }
 
+#ifdef CONFIG_FIT_SIGNATURE
 static int bootm_host_load_image(const void *fit, int req_image_type, int cfg_noffset)
 {
 	const char *fit_uname_config = NULL;
@@ -979,5 +994,6 @@ int bootm_host_load_images(const void *fit, int cfg_noffset)
 	/* Return the first error we found */
 	return err;
 }
+#endif
 
 #endif /* ndef USE_HOSTCC */

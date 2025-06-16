@@ -26,6 +26,8 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#define SECURE_BOARD_MAGIC	0x5ECB001
+
 #if defined(CONFIG_CMD_IMI)
 static int image_info(unsigned long addr);
 #endif
@@ -96,6 +98,11 @@ static int do_bootm_subcommand(cmd_tbl_t *cmdtp, int flag, int argc,
 
 int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
+	if(SECURE_BOARD_MAGIC == gd->board_type) {
+		printf("Booting restricted without authentication!!\n");
+		reset_board();
+	}
+
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 	static int relocated = 0;
 
@@ -138,6 +145,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		BOOTM_STATE_OS_GO, &images, 1);
 }
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 int bootm_maybe_autostart(cmd_tbl_t *cmdtp, const char *cmd)
 {
 	const char *ep = getenv("autostart");
@@ -152,6 +160,7 @@ int bootm_maybe_autostart(cmd_tbl_t *cmdtp, const char *cmd)
 
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_SYS_LONGHELP
 static char bootm_help_text[] =

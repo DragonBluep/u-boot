@@ -261,25 +261,6 @@ int board_mmc_init(bd_t *bis)
 }
 #endif
 
-#ifdef CONFIG_QCA_SPI
-static void spi_clock_init(void)
-{
-	int cfg;
-
-	/* Configure qup1_spi_apps_clk_src */
-	cfg = (GCC_BLSP1_QUP1_SPI_APPS_CFG_RCGR_SRC_SEL |
-		GCC_BLSP1_QUP1_SPI_APPS_CFG_RCGR_SRC_DIV);
-	writel(cfg, GCC_BLSP1_QUP1_SPI_APPS_CFG_RCGR);
-
-	writel(CMD_UPDATE, GCC_BLSP1_QUP1_SPI_APPS_CMD_RCGR);
-	mdelay(100);
-	writel(ROOT_EN, GCC_BLSP1_QUP1_SPI_APPS_CMD_RCGR);
-
-	/* Configure CBCR */
-	writel(CLK_ENABLE, GCC_BLSP1_QUP1_SPI_APPS_CBCR);
-}
-#endif
-
 void board_nand_init(void)
 {
 #ifdef CONFIG_QCA_SPI
@@ -289,10 +270,10 @@ void board_nand_init(void)
 	qpic_nand_init(NULL);
 
 #ifdef CONFIG_QCA_SPI
-	spi_clock_init();
 	gpio_node = fdt_path_offset(gd->fdt_blob, "/spi/spi_gpio");
 	if (gpio_node >= 0) {
 		qca_gpio_init(gpio_node);
+		spi_clock_init(0);
 		ipq_spi_init(CONFIG_IPQ_SPI_NOR_INFO_IDX);
 	}
 #ifdef CONFIG_SPI_NAND
@@ -1188,6 +1169,7 @@ void reset_board(void)
 	while(1);
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_auto_restart(void *blob)
 {
 	const char *paniconwcssfatal;
@@ -1204,6 +1186,7 @@ void fdt_fixup_auto_restart(void *blob)
 	}
 	return;
 }
+#endif
 
 int is_secondary_core_off(unsigned int cpuid)
 {
@@ -1250,48 +1233,37 @@ unsigned int get_dts_machid(unsigned int machid)
 
 void ipq_uboot_fdt_fixup(void)
 {
-	int ret, len;
-	char *config = NULL;
-
+	init_config_list();
 	switch (gd->bd->bi_arch_number)
 	{
 		case MACH_TYPE_IPQ6018_AP_CP01_C2:
-			config = "config@cp01-c2";
+			add_config_entry("config@cp01-c2");
+			add_config_entry("config-cp01-c2");
 			break;
 		case MACH_TYPE_IPQ6018_AP_CP01_C3:
-			config = "config@cp01-c3";
+			add_config_entry("config@cp01-c3");
+			add_config_entry("config-cp01-c3");
 			break;
 		case MACH_TYPE_IPQ6018_AP_CP01_C4:
-			config = "config@cp01-c4";
+			add_config_entry("config@cp01-c4");
+			add_config_entry("config-cp01-c4");
 			break;
 		case MACH_TYPE_IPQ6018_AP_CP01_C5:
-			config = "config@cp01-c5";
+			add_config_entry("config@cp01-c5");
+			add_config_entry("config-cp01-c5");
 			break;
-	}
-
-	if (config != NULL)
-	{
-		len = fdt_totalsize(gd->fdt_blob) + strlen(config) + 1;
-
-		/*
-		 * Open in place with a new length.
-		*/
-		ret = fdt_open_into(gd->fdt_blob, (void *)gd->fdt_blob, len);
-		if (ret)
-			 printf("uboot-fdt-fixup: Cannot expand FDT: %s\n", fdt_strerror(ret));
-
-		ret = fdt_setprop((void *)gd->fdt_blob, 0, "config_name",
-				config, (strlen(config)+1));
-		if (ret)
-			printf("uboot-fdt-fixup: unable to set config_name(%d)\n", ret);
+		default:
+			add_config_list_from_fdt();
 	}
 	return;
 }
 
+#ifdef CONFIG_IPQ_FDT_FIXUP
 void fdt_fixup_set_qca_cold_reboot_enable(void *blob)
 {
 	parse_fdt_fixup("/soc/qca,scm_restart_reason%qca,coldreboot-enabled%1", blob);
 }
+#endif
 
 void fdt_fixup_for_atf(void *blob)
 {
@@ -1300,6 +1272,12 @@ void fdt_fixup_for_atf(void *blob)
 	else {
 		parse_fdt_fixup("/soc/qcom_q6v5_wcss@CD00000%qcom,nosecure%1", blob);
 		parse_fdt_fixup("/soc/qcom_q6v5_wcss@CD00000%qca,wcss-aon-reset-seq%1", blob);
+	}
+	if (fdt_path_offset(blob, "/soc/dma@704000") >= 0) {
+		parse_fdt_fixup("/soc/dma@704000%qcom,controlled-remotely%0",
+				blob);
+		parse_fdt_fixup("/soc/dma@704000%qti,config-pipe-trust-reg%2",
+				blob);
 	}
 }
 

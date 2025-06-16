@@ -289,7 +289,7 @@ static int abortboot(int bootdelay)
 
 static void process_fdt_options(const void *blob)
 {
-#if defined(CONFIG_OF_CONTROL)
+#if defined(CONFIG_OF_CONTROL) && !defined(CONFIG_REDUCE_FOOTPRINT)
 	ulong addr;
 
 	/* Add an env variable to point to a kernel payload, if available */
@@ -324,7 +324,7 @@ const char *bootdelay_process(void)
 	s = getenv("bootdelay");
 	bootdelay = s ? (int)simple_strtol(s, NULL, 10) : CONFIG_BOOTDELAY;
 
-#ifdef CONFIG_OF_CONTROL
+#if defined(CONFIG_OF_CONTROL) && !defined(CONFIG_REDUCE_FOOTPRINT)
 	bootdelay = fdtdec_get_config_int(gd->fdt_blob, "bootdelay",
 			bootdelay);
 #endif
@@ -386,13 +386,13 @@ void autoboot_command(const char *s)
 			if (s) {
 				if (strncmp(s, "1", sizeof("1"))) {
 					printf("\nError: Invalid variable dump_minimal \n");
-					reset_board();
+					crashdump_exit();
 				}
 			}
 		}
 		if (s) {
 			do_dumpqca_minimal_data(s);
-			reset_board();
+			crashdump_exit();
 		}
 		else
 			dump_func(FULL_DUMP);
@@ -428,5 +428,8 @@ void autoboot_command(const char *s)
 #ifdef CONFIG_IPQ_ETH_INIT_DEFER
 	puts("\nNet:   ");
 	eth_initialize();
+#endif
+#ifdef CONFIG_IPQ_PCI_INIT_DEFER
+	pci_init();
 #endif
 }

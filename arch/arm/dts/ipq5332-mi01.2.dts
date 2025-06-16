@@ -17,7 +17,7 @@
 #include "ipq5332-soc.dtsi"
 / {
 	machid = <0x8060001>;
-	config_name = "config@mi01.2";
+	config_name = "config@mi01.2", "config-mi01.2", "config@rdp441", "config-rdp441";
 
 	aliases {
 		console = "/serial@78AF000";
@@ -42,6 +42,38 @@
 				gpio = <19>;
 				func = <1>;
 				pull = <GPIO_PULL_UP>;
+				drvstr = <GPIO_8MA>;
+			};
+		};
+	};
+
+	spi {
+		spi_gpio {
+			blsp0_spi_clk {
+				gpio = <14>;
+				func = <1>;
+				pull = <GPIO_PULL_DOWN>;
+				oe = <GPIO_OE_ENABLE>;
+				drvstr = <GPIO_8MA>;
+			};
+			blsp0_spi_mosi {
+				gpio = <15>;
+				func = <1>;
+				pull = <GPIO_PULL_DOWN>;
+				oe = <GPIO_OE_ENABLE>;
+				drvstr = <GPIO_8MA>;
+			};
+			blsp0_spi_miso {
+				gpio = <16>;
+				func = <1>;
+				pull = <GPIO_PULL_DOWN>;
+				drvstr = <GPIO_8MA>;
+			};
+			blsp0_spi_cs {
+				gpio = <17>;
+				func = <1>;
+				pull = <GPIO_PULL_UP>;
+				oe = <GPIO_OE_ENABLE>;
 				drvstr = <GPIO_8MA>;
 			};
 		};
@@ -183,6 +215,8 @@
 		qca808x_gpio = <51>;
 		qca808x_gpio_cnt = <1>;
 		qca8084_switch_enable = <1>;
+		sfp_gpio = <24>;
+		sfp_gpio_cnt = <1>;
 
 		port_phyinfo {
 			port@0 {

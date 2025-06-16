@@ -25,15 +25,15 @@ CONFIG_IPQ_TINY=y
 #
 # Info commands
 #
-# CONFIG_CMD_BDI is not set
-# CONFIG_CMD_CONSOLE is not set
+CONFIG_CMD_BDI=y
+CONFIG_CMD_CONSOLE=y
 
 #
 # Boot commands
 #
 # CONFIG_CMD_BOOTD is not set
 CONFIG_CMD_BOOTM=y
-# CONFIG_CMD_GO is not set
+CONFIG_CMD_GO=y
 CONFIG_CMD_RUN=y
 # CONFIG_CMD_IMI is not set
 # CONFIG_CMD_IMLS is not set
@@ -44,7 +44,7 @@ CONFIG_CMD_RUN=y
 #
 CONFIG_CMD_EXPORTENV=y
 CONFIG_CMD_IMPORTENV=y
-# CONFIG_CMD_EDITENV is not set
+CONFIG_CMD_EDITENV=y
 CONFIG_CMD_SAVEENV=y
 CONFIG_CMD_ENV_EXISTS=y
 
@@ -62,29 +62,41 @@ CONFIG_CMD_CRC32=y
 # Device access commands
 #
 
-# CONFIG_CMD_DM is not set
+CONFIG_CMD_DM=y
 # CONFIG_CMD_DEMO is not set
-# CONFIG_CMD_LOADB is not set
-# CONFIG_CMD_LOADS is not set
-# CONFIG_CMD_FLASH is not set
+CONFIG_CMD_LOADB=y
+CONFIG_CMD_LOADS=y
+CONFIG_CMD_FLASH=y
 # CONFIG_CMD_NAND is not set
 # CONFIG_CMD_SF is not set
 # CONFIG_CMD_SPI is not set
 # CONFIG_CMD_I2C is not set
 # CONFIG_CMD_USB is not set
-# CONFIG_CMD_FPGA is not set
+CONFIG_CMD_FPGA=y
 
 #
 # Shell scripting commands
 #
 CONFIG_CMD_ECHO=y
-# CONFIG_CMD_ITEST is not set
+CONFIG_CMD_ITEST=y
 CONFIG_CMD_SOURCE=y
-# CONFIG_CMD_SETEXPR is not set
+CONFIG_CMD_SETEXPR=y
 
 #
 # Network commands
 #
+
+#
+# Network PHY
+#
+# CONFIG_IPQ_QCA_AQUANTIA_PHY is not set
+# CONFIG_QCA8033_PHY is not set
+CONFIG_QCA8081_PHY=y
+CONFIG_QCA8084_PHY=y
+CONFIG_QCA8084_SWT_MODE=y
+CONFIG_QCA8084_BYPASS_MODE=y
+# CONFIG_ATHRS17C_SWITCH is not set
+
 CONFIG_CMD_NET=y
 # CONFIG_CMD_TFTPPUT is not set
 # CONFIG_CMD_TFTPSRV is not set
@@ -106,7 +118,7 @@ CONFIG_CMD_MISC=y
 # CONFIG_PARTITION_UUIDS is not set
 # CONFIG_CMD_TIMER is not set
 # CONFIG_IPQ_TZT is not set
-# CONFIG_UBI_WRITE is not set
+CONFIG_UBI_WRITE=y
 #
 # Boot timing
 #
@@ -210,12 +222,12 @@ CONFIG_SIMPLE_BUS=y
 #
 # Generic NAND options
 #
-# CONFIG_NAND_FLASH is not set
+CONFIG_NAND_FLASH=y
 
 #
 # Serial NAND
 #
-# CONFIG_QPIC_SERIAL is not set
+CONFIG_QPIC_SERIAL=y
 
 #
 # SPI Flash Support
@@ -226,7 +238,7 @@ CONFIG_SIMPLE_BUS=y
 # CONFIG_PHYLIB is not set
 # CONFIG_NETDEVICES is not set
 # CONFIG_IPQ_MTD_NOR is not set
-CONFIG_IPQ_TINY_SPI_NOR=y
+# CONFIG_IPQ_TINY_SPI_NOR is not set
 
 #
 # PCI
@@ -297,15 +309,6 @@ CONFIG_REQUIRE_SERIAL_CONSOLE=y
 #
 
 #
-# Ethernet PHY
-#
-# CONFIG_QCA8033_PHY is not set
-# CONFIG_IPQ_QCA_AQUANTIA_PHY is not set
-# CONFIG_QCA8081_PHY is not set
-# CONFIG_QCA8084_PHY is not set
-# CONFIG_ATHRS17C_SWITCH is not set
-
-#
 # Library routines
 
 #
@@ -335,16 +338,8 @@ CONFIG_LZMA=y
 # CONFIG_ERRNO_STR is not set
 # CONFIG_UNIT_TEST is not set
 
-#
-# Thumb2 mode support
-#
 CONFIG_SYS_THUMB_BUILD=y
 CONFIG_HAS_THUMB2=y
-
-#
-# ART uncompression support
-#
-CONFIG_ART_COMPRESSED=y
 
 #
 # DPR support

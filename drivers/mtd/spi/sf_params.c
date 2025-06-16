@@ -14,6 +14,7 @@
 
 /* SPI/QSPI flash device params structure */
 const struct spi_flash_params spi_flash_params_table[] = {
+#ifndef CONFIG_IPQ_TINY_SPI_NOR
 #ifdef CONFIG_SPI_FLASH_ATMEL		/* ATMEL */
 	{"AT45DB011D",	   0x1f2200, 0x0,	64 * 1024,     4, RD_NORM,		    SECT_4K},
 	{"AT45DB021D",	   0x1f2300, 0x0,	64 * 1024,     8, RD_NORM,		    SECT_4K},
@@ -150,6 +151,10 @@ const struct spi_flash_params spi_flash_params_table[] = {
 	{"W25Q64DW",	   0xef6017, 0x0,	64 * 1024,   128, RD_FULL,	    WR_QPP | SECT_4K},
 	{"W25Q128FW",	   0xef6018, 0x0,	64 * 1024,   256, RD_FULL,	    WR_QPP | SECT_4K},
 	{"W25Q256JW",	   0xef6019, 0x0,	64 * 1024,   512, RD_FULL,	    WR_QPP | SECT_4K},
+#endif
+#else	/* CONFIG_IPQ_TINY_SPI_NOR: Add only 16M flash with Minimum Sector Size of 4K */
+	{"GD25LB128D",	   0xc86018, 0x0,	 4 * 1024,   4096, RD_NORM,		     SECT_4K},
+	{"MX25U12832F",	   0xc22538, 0x0,	 4 * 1024,   4096, RD_NORM,		     SECT_4K},
 #endif
 	{},	/* Empty entry to terminate the list */
 	/*

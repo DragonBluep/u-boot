@@ -106,9 +106,9 @@ except ImportError:
     try:
         from ordereddict import OrderedDict
     except ImportError:
-        print "error: this script requires the 'ordereddict' class."
-        print "Try 'pip install --user ordereddict'"
-        print "Or  'easy_install --user ordereddict'"
+        print("error: this script requires the 'ordereddict' class.")
+        print("Try 'pip install --user ordereddict'")
+        print("Or  'easy_install --user ordereddict'")
         sys.exit(1)
 
 def error(msg, ex=None):
@@ -126,6 +126,20 @@ def error(msg, ex=None):
 FlashInfo = namedtuple("FlashInfo", "type pagesize blocksize chipsize")
 ImageInfo = namedtuple("ProgInfo", "name filename type")
 PartInfo = namedtuple("PartInfo", "name offset length which_flash")
+
+def hdrobj_byte2str(gpthdr):
+    temp_tuple = tuple(gpthdr)
+    gpthdr=[]
+    for x in temp_tuple:
+        if isinstance(x, bytes):
+            try:
+                x = x.decode("utf-8")
+            except:
+                x = 0
+        gpthdr.append(x)
+
+    gpthdr = tuple(gpthdr)
+    return gpthdr
 
 class GPT(object):
     GPTheader = namedtuple("GPTheader", "signature revision header_size"
@@ -153,6 +167,7 @@ class GPT(object):
         part_fp.seek(self.blocksize, os.SEEK_SET)
         gptheader_str = part_fp.read(struct.calcsize(GPT.GPT_HEADER_FMT))
         gptheader = struct.unpack(GPT.GPT_HEADER_FMT, gptheader_str)
+        gptheader = hdrobj_byte2str(gptheader)
         gptheader = GPT.GPTheader._make(gptheader)
 
         if gptheader.signature != GPT.GPT_SIGNATURE:
@@ -181,6 +196,7 @@ class GPT(object):
         for i in range(gptheader.num_part_entry):
             gpt_table_str = part_fp.read(struct.calcsize(GPT.GPT_TABLE_FMT))
             gpt_table = struct.unpack(GPT.GPT_TABLE_FMT, gpt_table_str)
+            gpt_table = hdrobj_byte2str(gpt_table)
             gpt_table = GPT.GPTtable._make(gpt_table)
 
             block_start = gpt_table.first_lba
@@ -205,9 +221,9 @@ class GPT(object):
         """Returns a list of partitions present in the GPT."""
 
         try:
-            with open(self.filename, "r") as part_fp:
+            with open(self.filename, "rb") as part_fp:
                 self.__validate_and_read_parts(part_fp)
-        except IOError, e:
+        except IOError as e:
             error("error opening %s" % self.filename, e)
 
         return self.__partitions
@@ -230,7 +246,7 @@ class MIBIB(object):
                         " attr1 attr2 attr3 which_flash")
     ENTRY_FMT = "<16sLLBBBB"
 
-    def __init__(self, filename, flinfo, nand_blocksize, nand_chipsize, root_part):
+    def __init__(self, filename, flinfo, nand_blocksize, nand_chipsize):
         self.filename = filename
         self.pagesize = flinfo.pagesize
         self.blocksize = flinfo.blocksize
@@ -240,27 +256,29 @@ class MIBIB(object):
         self.__partitions = OrderedDict()
 
     def __validate(self, part_fp):
-       """Validate the MIBIB by checking for magic bytes."""
+        """Validate the MIBIB by checking for magic bytes."""
 
-       mheader_str = part_fp.read(struct.calcsize(MIBIB.HEADER_FMT))
-       mheader = struct.unpack(MIBIB.HEADER_FMT, mheader_str)
-       mheader = MIBIB.Header._make(mheader)
+        mheader_str = part_fp.read(struct.calcsize(MIBIB.HEADER_FMT))
+        mheader = struct.unpack(MIBIB.HEADER_FMT, mheader_str)
+        mheader = hdrobj_byte2str(mheader)
+        mheader = MIBIB.Header._make(mheader)
 
-       if (mheader.magic1 != MIBIB.HEADER_MAGIC1
-           or mheader.magic2 != MIBIB.HEADER_MAGIC2):
-           """ mheader.magic1 = MIBIB.HEADER_MAGIC1
-           mheader.magic2 = MIBIB.HEADER_MAGIC2 """
-           error("invalid partition table, magic byte not present")
+        if (mheader.magic1 != MIBIB.HEADER_MAGIC1
+            or mheader.magic2 != MIBIB.HEADER_MAGIC2):
+            """ mheader.magic1 = MIBIB.HEADER_MAGIC1
+            mheader.magic2 = MIBIB.HEADER_MAGIC2 """
+            error("invalid partition table, magic byte not present")
 
-       if mheader.version != MIBIB.HEADER_VERSION:
-           error("unsupport mibib version")
+        if mheader.version != MIBIB.HEADER_VERSION:
+            error("unsupport mibib version")
 
     def __read_parts(self, part_fp):
         """Read the partitions from the MIBIB."""
-	global ARCH_NAME
+        global ARCH_NAME
         part_fp.seek(self.pagesize, os.SEEK_SET)
         mtable_str = part_fp.read(struct.calcsize(MIBIB.TABLE_FMT))
         mtable = struct.unpack(MIBIB.TABLE_FMT, mtable_str)
+        mtable = hdrobj_byte2str(mtable)
         mtable = MIBIB.Table._make(mtable)
 
         if (mtable.magic1 != MIBIB.TABLE_MAGIC1
@@ -275,6 +293,7 @@ class MIBIB(object):
         for i in range(mtable.numparts):
             mentry_str = part_fp.read(struct.calcsize(MIBIB.ENTRY_FMT))
             mentry = struct.unpack(MIBIB.ENTRY_FMT, mentry_str)
+            mentry = hdrobj_byte2str(mentry)
             mentry = MIBIB.Entry._make(mentry)
             self.flash_flag = self.blocksize
             self.chip_flag = self.chipsize
@@ -286,9 +305,9 @@ class MIBIB(object):
             byte_offset = mentry.offset * self.flash_flag
 
             if mentry.length == 0xFFFFFFFF:
-               byte_length = self.chip_flag - byte_offset
+                byte_length = self.chip_flag - byte_offset
             else:
-               byte_length = mentry.length * self.flash_flag
+                byte_length = mentry.length * self.flash_flag
 
             part_name = mentry.name.strip(chr(0))
             part_info = PartInfo(part_name, byte_offset, byte_length, mentry.which_flash)
@@ -298,10 +317,10 @@ class MIBIB(object):
         """Returns a list of partitions present in the MIBIB. CE """
 
         try:
-            with open(self.filename, "r") as part_fp:
+            with open(self.filename, "rb") as part_fp:
                 self.__validate(part_fp)
                 self.__read_parts(part_fp)
-        except IOError, e:
+        except IOError as e:
             error("error opening %s" % self.filename, e)
 
         return self.__partitions
@@ -392,17 +411,17 @@ class FlashScript(object):
         value -- string, the list of values to compare with
         """
 
-	n_val = len(val_list)
-	item = 1
-	cmd_str = "if "
-	for val in val_list:
-	    cmd_str = cmd_str + str('test "$%s" = "%s"' % (var, val))
-	    #cmd_str = cmd_str + "\"$" + var + "\"" + "=" + "\"" + val + "\""
-	    if item <= (n_val - 1):
-		cmd_str = cmd_str + " || "
-	    item = item + 1
+        n_val = len(val_list)
+        item = 1
+        cmd_str = "if "
+        for val in val_list:
+            cmd_str = cmd_str + str('test "$%s" = "%s"' % (var, val))
+            #cmd_str = cmd_str + "\"$" + var + "\"" + "=" + "\"" + val + "\""
+            if item <= (n_val - 1):
+                cmd_str = cmd_str + " || "
+            item = item + 1
 
-	self.append('%s; then\n' % cmd_str, fatal=False)
+        self.append('%s; then\n' % cmd_str, fatal=False)
 
     def end_if(self):
         """Generate code, to end if statement."""
@@ -435,7 +454,7 @@ def sha1(message):
     """Returns SHA1 digest in hex format of the message."""
 
     m = hashlib.sha1()
-    m.update(message)
+    m.update(message.encode('utf-8'))
     return m.hexdigest()
 
 class Pack(object):
@@ -466,7 +485,7 @@ class Pack(object):
         try:
             machid = int(section.find(".//machid").text, 0)
             machid = "%x" % machid
-        except ValueError, e:
+        except ValueError as e:
             error("invalid value for machid, should be integer")
 
         return machid
@@ -481,7 +500,7 @@ class Pack(object):
             return 0
         try:
             return getsize(os.path.join(self.images_dname, filename))
-        except OSError, e:
+        except OSError as e:
             error("error getting image size '%s'" % filename, e)
 
     def __get_part_info(self, partition):
@@ -491,18 +510,100 @@ class Pack(object):
         """
         try:
             return self.partitions[partition]
-        except KeyError, e:
+        except KeyError as e:
             return None
 
+    def __gen_flash_script_bootconfig(self, entries, partition, flinfo, script, part_section):
+        global ARCH_NAME
+        fw_imgs = []
+        skip_size_check = ""
+
+        if flinfo.type != "emmc":
+            fw_objs = part_section.findall('img_name')
+            if (len(fw_objs) <= 1):
+                return 0
+
+            for i in fw_objs:
+                fw_imgs.append(i.text)
+        else:
+            if 'bootconfig_type_max' in part_section.attrib and image_type == "all":
+                max_files = int(part_section.attrib['bootconfig_type_max'])
+            else:
+                return 0;
+
+            for fw_type in range(1, max_files+1):
+                if 'filename_img' + str(fw_type) in part_section.attrib:
+                    filename = part_section.attrib['filename_img' + str(fw_type)]
+                    if filename == "":
+                        continue
+                    fw_imgs.append(filename)
+
+        i = 0
+        for filename in fw_imgs:
+            machid_list = []
+            i = i + 1
+
+            for section in entries:
+                file_type = section.find('.//bootconfig_type')
+                if file_type == None:
+                    continue
+
+                file_type = str(section.find(".//bootconfig_type").text)
+                if str(file_type) != str(i):
+                    continue
+
+                machid = int(section.find(".//machid").text, 0)
+                machid = "%x" % machid
+                machid_list.append(machid)
+
+            img_size = self.__get_img_size(filename)
+            part_info = self.__get_part_info(partition)
+
+            section_label = partition.split(":")
+            if len(section_label) != 1:
+                section_conf = section_label[1]
+            else:
+                section_conf = section_label[0]
+            section_conf = section_conf.lower()
+
+            if self.flinfo.type != "emmc":
+                if part_info == None:
+                    if self.flinfo.type == 'norplusnand':
+                        if count > 2:
+                            error("More than 2 NAND images for NOR+NAND is not allowed")
+                elif img_size > part_info.length:
+                    print("img size is larger than part. len in '%s'" % section_conf)
+                    return 0
+            else:
+                if part_info != None:
+                    if (img_size > 0):
+                        if img_size > (part_info.length * self.flinfo.blocksize):
+                            print("img size is larger than part. len in '%s'" % section_conf)
+                            return 0
+
+            if part_info == None and self.flinfo.type != 'norplusnand':
+                print("Flash type is norplusemmc")
+                return 1
+
+            if len(machid_list) > 0:
+                script.start_if_or("machid", machid_list)
+
+                if img_size > 0:
+                    script.imxtract_n_flash(filename[:-4] + "-" + sha1(filename), part_info.name)
+
+                script.end_if()
+
+        return 1
+
     def __gen_flash_script_cdt(self, entries, partition, flinfo, script):
-	global ARCH_NAME
+        global ARCH_NAME
         for section in entries:
             machid = self.__get_machid(section)
             board = section.find(".//board").text
 
             try:
                 memory = section.find(".//memory").text
-            except AttributeError, e:
+            except AttributeError as e:
                 memory = "128M16"
             if memory_size != "default":
                 filename = "cdt-" + board + "_" + memory + "_LM" + memory_size + ".bin"
@@ -521,22 +622,22 @@ class Pack(object):
             section_conf = section_conf.lower()
 
             if self.flinfo.type != "emmc":
-               if part_info == None:
-                   if self.flinfo.type == 'norplusnand':
-                       if count > 2:
-                           error("More than 2 NAND images for NOR+NAND is not allowed")
-               elif img_size > part_info.length:
-                   print "img size is larger than part. len in '%s'" % section_conf
-                   return 0
+                if part_info == None:
+                    if self.flinfo.type == 'norplusnand':
+                        if count > 2:
+                            error("More than 2 NAND images for NOR+NAND is not allowed")
+                elif img_size > part_info.length:
+                    print("img size is larger than part. len in '%s'" % section_conf)
+                    return 0
             else:
                 if part_info != None:
                     if (img_size > 0):
                         if img_size > (part_info.length * self.flinfo.blocksize):
-                            print "img size is larger than part. len in '%s'" % section_conf
+                            print("img size is larger than part. len in '%s'" % section_conf)
                             return 0
 
             if part_info == None and self.flinfo.type != 'norplusnand':
-                print "Flash type is norplusemmc"
+                print("Flash type is norplusemmc")
                 continue
 
             if machid:
@@ -554,90 +655,90 @@ class Pack(object):
         if multi_fw_check != None:
             script.append(multi_fw_check[0], fatal=False)
 
-	script.imxtract_n_flash(fw_filename[:-13] + "-" + sha1(fw_filename), "wifi_fw")
+        script.imxtract_n_flash(fw_filename[:-13] + "-" + sha1(fw_filename), "wifi_fw")
 
         if multi_fw_check != None:
             for i in range(multi_fw_check[1]):
-    	        script.end_if()
+                script.end_if()
 
-	return 1
+        return 1
 
     def __gen_flash_script_for_non_ubi_wififw(self, partition, filename, flinfo, script, multi_fw_check):
 
-	img_size = self.__get_img_size(filename)
-	part_info = self.__get_part_info(partition)
+        img_size = self.__get_img_size(filename)
+        part_info = self.__get_part_info(partition)
 
-	section_label = partition.split(":")
+        section_label = partition.split(":")
         if len(section_label) != 1:
-	    section_conf = section_label[1]
-	else:
-	    section_conf = section_label[0]
-	section_conf = section_conf.lower()
+            section_conf = section_label[1]
+        else:
+            section_conf = section_label[0]
+        section_conf = section_conf.lower()
 
-	if self.flinfo.type != "emmc":
-	    if part_info == None:
-		if self.flinfo.type == 'norplusnand':
-		    if count > 2:
-			error("More than 2 NAND images for NOR+NAND is not allowed")
-	    elif img_size > part_info.length:
-		print "img size is larger than part. len in '%s'" % section_conf
-		return 0
-	else:
-	    if part_info != None:
-		if (img_size > 0):
-		    if img_size > (part_info.length * self.flinfo.blocksize):
-			print "img size is larger than part. len in '%s'" % section_conf
-			return 0
+        if self.flinfo.type != "emmc":
+            if part_info == None:
+                if self.flinfo.type == 'norplusnand':
+                    if count > 2:
+                        error("More than 2 NAND images for NOR+NAND is not allowed")
+            elif img_size > part_info.length:
+                print("img size is larger than part. len in '%s'" % section_conf)
+                return 0
+        else:
+            if part_info != None:
+                if (img_size > 0):
+                    if img_size > (part_info.length * self.flinfo.blocksize):
+                        print("img size is larger than part. len in '%s'" % section_conf)
+                        return 0
 
-	if part_info == None and self.flinfo.type != 'norplusnand':
-	    print "Flash type is norplusemmc"
-	    return 1
+        if part_info == None and self.flinfo.type != 'norplusnand':
+            print("Flash type is norplusemmc")
+            return 1
 
         if multi_fw_check != None:
             script.append(multi_fw_check[0], fatal=False)
 
-	if img_size > 0:
-		script.imxtract_n_flash(filename[:-13] + "-" + sha1(filename), part_info.name)
+        if img_size > 0:
+            script.imxtract_n_flash(filename[:-13] + "-" + sha1(filename), part_info.name)
 
         if multi_fw_check != None:
             for i in range(multi_fw_check[1]):
-    	        script.end_if()
+                script.end_if()
 
         return 1
 
     def __gen_flash_script_update_for_wififw(self, partition, filename, flinfo, script, machid_list):
-	script.start_if_or("machid", machid_list)
+        script.start_if_or("machid", machid_list)
 
         if ver_check == True:
             combs = self.__find_wifi_fw_ver_combinations(filename)
-            for k, v in combs.iteritems():
-                if flinfo.type != "emmc":
+            for k, v in combs.items():
+                if self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
                     self.__gen_flash_script_for_ubi_wififw(k, script, v)
                 else:
                     self.__gen_flash_script_for_non_ubi_wififw(partition, k, flinfo, script, v)
         else:
-            if flinfo.type != "emmc":
+            if self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
                 self.__gen_flash_script_for_ubi_wififw(filename, script, None)
             else:
-               self.__gen_flash_script_for_non_ubi_wififw(partition, filename, flinfo, script, None)
+                self.__gen_flash_script_for_non_ubi_wififw(partition, filename, flinfo, script, None)
 
         script.end_if()
 
     def __gen_flash_script_wififw(self, entries, partition, filename, wifi_fw_type, flinfo, script):
         machid_list = []
-	for section in entries:
+        for section in entries:
 
-	    wififw_type = section.find('.//wififw_name')
-	    if wififw_type == None:
-		continue
-	    wififw_type = str(section.find(".//wififw_name").text)
+            wififw_type = section.find('.//wififw_name')
+            if wififw_type == None:
+                continue
+            wififw_type = str(section.find(".//wififw_name").text)
 
-	    if str(wifi_fw_type) != str(wififw_type):
-		continue
+            if str(wifi_fw_type) != str(wififw_type):
+                continue
 
-	    machid = int(section.find(".//machid").text, 0)
-	    machid = "%x" % machid
-	    if self.flash_type == "nor":
+            machid = int(section.find(".//machid").text, 0)
+            machid = "%x" % machid
+            if self.flash_type == "nor":
                 is_nor_flash = section.find(".//spi_nor")
                 if is_nor_flash == None:
                     continue
@@ -661,9 +762,9 @@ class Pack(object):
             if tiny_image == None:
                 continue
 
-	    if memory_size != "default":
+            if memory_size != "default":
                 filename = "bootldr1_" + board + "_" + memory + "_LM" + memory_size + ".mbn"
-	    else:
+            else:
                 filename = "bootldr1_" + board + "_" + memory + ".mbn"
 
             img_size = self.__get_img_size(filename)
@@ -678,22 +779,22 @@ class Pack(object):
             section_conf = section_conf.lower()
 
             if self.flinfo.type != "emmc":
-               if part_info == None:
-                   if self.flinfo.type == 'norplusnand':
-                       if count > 2:
-                           error("More than 2 NAND images for NOR+NAND is not allowed")
-               elif img_size > part_info.length:
-                   print "img size is larger than part. len in '%s'" % section_conf
-                   return 0
+                if part_info == None:
+                    if self.flinfo.type == 'norplusnand':
+                        if count > 2:
+                            error("More than 2 NAND images for NOR+NAND is not allowed")
+                elif img_size > part_info.length:
+                    print("img size is larger than part. len in '%s'" % section_conf)
+                    return 0
             else:
                 if part_info != None:
                     if (img_size > 0):
                         if img_size > (part_info.length * self.flinfo.blocksize):
-                            print "img size is larger than part. len in '%s'" % section_conf
+                            print("img size is larger than part. len in '%s'" % section_conf)
                             return 0
 
             if part_info == None and self.flinfo.type != 'norplusnand':
-                print "Flash type is norplusemmc"
+                print("Flash type is norplusemmc")
                 continue
 
             if machid:
@@ -710,15 +811,15 @@ class Pack(object):
     def __gen_script_mibib(self, script, flinfo, parts, parts_length, cmd):
 
         for index in range(parts_length):
-             partition = parts[index]
-             pnames = partition.findall('name')
-             if pnames[0].text == "0:MIBIB":
-                 imgs = partition.findall('img_name')
-                 filename = imgs[0].text
-                 if cmd == "mibib_reload":
-                     self.mibib_reload(filename, pnames[0].text, flinfo, script)
-                 if cmd == "xtract_n_flash":
-                     script.imxtract_n_flash("mibib-" + sha1(filename), "0:MIBIB")
+            partition = parts[index]
+            pnames = partition.findall('name')
+            if pnames[0].text == "0:MIBIB":
+                imgs = partition.findall('img_name')
+                filename = imgs[0].text
+                if cmd == "mibib_reload":
+                    self.mibib_reload(filename, pnames[0].text, flinfo, script)
+                if cmd == "xtract_n_flash":
+                    script.imxtract_n_flash("mibib-" + sha1(filename), "0:MIBIB")
 
     def mibib_reload(self, filename, partition, flinfo, script):
 
@@ -744,64 +845,64 @@ class Pack(object):
 
     def __gen_flash_script_image(self, parts, parts_length, filename, soc_version, file_exists, machid, partition, flinfo, script):
 
-	    img_size = 0
-	    if file_exists == 1:
-                img_size = self.__get_img_size(filename)
-            part_info = self.__get_part_info(partition)
+        img_size = 0
+        if file_exists == 1:
+            img_size = self.__get_img_size(filename)
+        part_info = self.__get_part_info(partition)
 
-            section_label = partition.split(":")
-            if len(section_label) != 1:
-                section_conf = section_label[1]
-            else:
-                section_conf = section_label[0]
+        section_label = partition.split(":")
+        if len(section_label) != 1:
+            section_conf = section_label[1]
+        else:
+            section_conf = section_label[0]
 
-            section_conf = section_conf.lower()
+        section_conf = section_conf.lower()
 
-            if self.flinfo.type != "emmc":
-                if part_info == None:
-                    if self.flinfo.type == 'norplusnand':
-                        if count > 2:
-                            error("More than 2 NAND images for NOR+NAND is not allowed")
-                elif img_size > part_info.length:
-                    print "img size is larger than part. len in '%s'" % section_conf
-                    return 0
-            else:
-                if part_info != None:
-                    if (img_size > 0):
-                        if img_size > (part_info.length * self.flinfo.blocksize):
-                            print "img size is larger than part. len in '%s'" % section_conf
-                            return 0
+        if self.flinfo.type != "emmc":
+            if part_info == None:
+                if self.flinfo.type == 'norplusnand':
+                    if count > 2:
+                        error("More than 2 NAND images for NOR+NAND is not allowed")
+            elif img_size > part_info.length:
+                print("img size is larger than part. len in '%s'" % section_conf)
+                return 0
+        else:
+            if part_info != None:
+                if (img_size > 0):
+                    if img_size > (part_info.length * self.flinfo.blocksize):
+                        print("img size is larger than part. len in '%s'" % section_conf)
+                        return 0
 
-	    if part_info == None and self.flinfo.type != 'norplusnand':
-                print "Flash type is norplusemmc"
-                return 1
-
-	    if machid:
-		script.start_if("machid", machid)
-
-            if section_conf == "qsee":
-                section_conf = "tz"
-            elif section_conf == "appsbl":
-                section_conf = "u-boot"
-            elif section_conf == "rootfs" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
-                section_conf = "ubi"
-            elif section_conf == "wififw" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
-                section_conf = "wififw_ubi"
-
-	    if file_exists == 0:
-		script.append('setenv stdout serial && echo "error: binary image not found" && exit 1', fatal=False)
-		return 1
-
-            if img_size > 0:
-                 if section_conf == "mibib":
-                     self.__gen_script_mibib(script, flinfo, parts, parts_length, "xtract_n_flash")
-                 else:
-                     script.imxtract_n_flash(section_conf + "-" + sha1(filename), part_info.name)
-
-	    if machid:
-		script.end_if()
-
+        if part_info == None and self.flinfo.type != 'norplusnand':
+            print("Flash type is norplusemmc")
             return 1
+
+        if machid:
+            script.start_if("machid", machid)
+
+        if section_conf == "qsee":
+            section_conf = "tz"
+        elif section_conf == "appsbl":
+            section_conf = "u-boot"
+        elif section_conf == "rootfs" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
+            section_conf = "ubi"
+        elif section_conf == "wififw" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
+            section_conf = "wififw_ubi"
+
+        if file_exists == 0:
+            script.append('setenv stdout serial && echo "error: binary image not found" && exit 1', fatal=False)
+            return 1
+
+        if img_size > 0:
+            if section_conf == "mibib":
+                self.__gen_script_mibib(script, flinfo, parts, parts_length, "xtract_n_flash")
+            else:
+                script.imxtract_n_flash(section_conf + "-" + sha1(filename), part_info.name)
+
+        if machid:
+            script.end_if()
+
+        return 1
 
     def __gen_flash_script(self, script, flinfo, root, testmachid=False):
         """Generate the script to flash the images.
@@ -809,21 +910,22 @@ class Pack(object):
         info -- ConfigParser object, containing image flashing info
         script -- Script object, to append commands to
         """
-	global MODE
-	global SRC_DIR
-	global ARCH_NAME
+        global MODE
+        global SRC_DIR
+        global ARCH_NAME
+        global flash_size
 
-	diff_files = ""
+        diff_files = ""
         count = 0
-	soc_version = 0
-	diff_soc_ver_files = 0
-	file_exists = 1
-	wifi_fw_type = ""
+        soc_version = 0
+        diff_soc_ver_files = 0
+        file_exists = 1
+        wifi_fw_type = ""
 
         if self.flash_type == "norplusemmc" and flinfo.type == "emmc":
-            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + flinfo.type + "-partition.xml"
+            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + flinfo.type + "-partition"+ flash_size +".xml"
         else:
-            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + self.flash_type.lower() + "-partition.xml"
+            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + self.flash_type.lower() + "-partition"+ flash_size +".xml"
 
         root_part = ET.parse(srcDir_part)
         if self.flash_type != "emmc" and flinfo.type != "emmc":
@@ -843,9 +945,16 @@ class Pack(object):
         wifi_fw_list = []
         no_fw_mach_ids = []
         for segment in entries:
+            if (memory_size != "default"):
+                profiles = segment.find('.//profiles')
+                if (profiles == None):
+                    continue
+                if memory_size not in profiles.text:
+                    continue
+
             wififw_type = segment.find('.//wififw_name')
             if wififw_type == None:
-	        machid = int(segment.find(".//machid").text, 0)
+                machid = int(segment.find(".//machid").text, 0)
                 machid = "%x" % machid
 
                 no_fw_mach_ids.append(machid)
@@ -876,22 +985,22 @@ class Pack(object):
             script.script.append('echo \'soc_hw_version : unknown, skipping validation\'\n')
             script.script.append('fi\n')
 
-	if testmachid:
-	    machid_count = 0
-	    for section in entries:
+        if testmachid:
+            machid_count = 0
+            for section in entries:
                 machid = self.__get_machid(section)
-		machid_count =  machid_count + 1
-		if machid_count == 1:
-		    script.script.append('if test "$machid" = "%s" ' % machid)
-		else:
-		    script.script.append('|| test "$machid" = "%s" ' % machid)
-	    if machid_count >= 1:
-		    script.script.append('; then\n')
-		    script.script.append('echo \'machid : Validation success\'\n')
-		    script.script.append('else\n')
-		    script.script.append('echo \'machid : unknown, aborting upgrade\'\n')
-		    script.script.append('exit 1\n')
-		    script.script.append('fi\n')
+                machid_count =  machid_count + 1
+                if machid_count == 1:
+                    script.script.append('if test "$machid" = "%s" ' % machid)
+                else:
+                    script.script.append('|| test "$machid" = "%s" ' % machid)
+            if machid_count >= 1:
+                script.script.append('; then\n')
+                script.script.append('echo \'machid : Validation success\'\n')
+                script.script.append('else\n')
+                script.script.append('echo \'machid : unknown, aborting upgrade\'\n')
+                script.script.append('exit 1\n')
+                script.script.append('fi\n')
         first = False
         section = None
         part_index = 0
@@ -906,7 +1015,7 @@ class Pack(object):
         if flinfo.type == "emmc":
             script.append("flupdate set mmc")
 
-        if flinfo.type != "emmc":
+        if flinfo.type != "emmc" and image_type != "hlos":
             self.__gen_script_mibib(script, flinfo, parts, parts_length, "mibib_reload")
 
         for index in range(parts_length):
@@ -936,124 +1045,140 @@ class Pack(object):
                 part_index += 1
                 if flinfo.type != "emmc":
                     try:
-		        if image_type == "all" or section[8].attrib['image_type'] == image_type:
+                        if image_type == "all" or section[8].attrib['image_type'] == image_type:
                             filename = section[8].text
-		            try:
-		               if section[8].attrib['mode'] != MODE:
-		            	filename = section[9].text
-		               else:
-		            	pass
-		            except AttributeError, e:
-		               pass
-		            except KeyError, e:
-		               pass
-			else:
-			    continue
-                    except IndexError, e:
+                            try:
+                                if section[8].attrib['mode'] != MODE:
+                                    filename = section[9].text
+                                else:
+                                    pass
+                            except AttributeError as e:
+                                pass
+                            except KeyError as e:
+                                pass
+                        else:
+                            continue
+                    except IndexError as e:
                         if index == (parts_length - 1):
                             return
                         else:
                             continue
-                    except KeyError, e:
-			continue
+                    except KeyError as e:
+                        continue
                     partition = section[0].text
                 else:
-		    try:
-			diff_files = section.attrib['diff_files']
-		    except KeyError, e:
+                    try:
+                        diff_files = section.attrib['diff_files']
+                    except KeyError as e:
                         if tiny_16m == "true":
                             pass
-			else:
-			    try:
-				partition = section.attrib['label']
+                        elif 'bootconfig_type_max' in section.attrib and image_type == "all":
+                            partition = section.attrib['label']
+                        else:
+                            try:
+                                partition = section.attrib['label']
                                 if image_type == "all" or section.attrib['image_type'] == image_type:
                                     filename = section.attrib['filename']
                                     if filename == "":
                                         continue
-			    except KeyError, e:
-			        print "Skipping partition '%s'" % section.attrib['label']
-			        pass
+                            except KeyError as e:
+                                print("Skipping partition '%s'" % section.attrib['label'])
+                                pass
 
-		    if diff_files == "true":
-			try:
-			      if image_type == "all" or section.attrib['image_type'] == image_type:
-                                  filename = section.attrib['filename_' + MODE]
-                                  partition = section.attrib['label']
-			      if filename == "":
-					continue
-                        except KeyError, e:
-                               print "Skipping partition '%s'" % section.attrib['label']
-			       pass
-			diff_files = "" # Clear for next iteration
+                    if diff_files == "true":
+                        try:
+                            if image_type == "all" or section.attrib['image_type'] == image_type:
+                                filename = section.attrib['filename_' + MODE]
+                                partition = section.attrib['label']
+                            if filename == "":
+                                continue
+                        except KeyError as e:
+                            print("Skipping partition '%s'" % section.attrib['label'])
+                            pass
+                        diff_files = "" # Clear for next iteration
+
+            if "0:BOOTCONFIG" in partition:
+                try:
+                    ret = self.__gen_flash_script_bootconfig(entries, partition, flinfo, script, section)
+                    if ret == 1:
+                        continue
+                except KeyError as e:
+                    continue
 
             # Get machID
             if partition != "0:CDT" and partition != "0:DDRCONFIG":
                 machid = None
             else:
-		try:
-			if image_type == "all" or section.attrib['image_type'] == image_type:
-		                ret = self.__gen_flash_script_cdt(entries, partition, flinfo, script)
-				if ret == 0:
-				    return 0
-                                continue
-		except KeyError, e:
-			continue
-
-            if partition == "0:BOOTLDR1":
-                if image_type == "all" or section.attrib['image_type'] == image_type:
-                        ret = self.__gen_flash_script_bootldr(entries, partition, flinfo, script)
+                try:
+                    if image_type == "all" or section.attrib['image_type'] == image_type:
+                        ret = self.__gen_flash_script_cdt(entries, partition, flinfo, script)
                         if ret == 0:
                             return 0
                         continue
+                except KeyError as e:
+                    continue
+
+            if partition == "0:BOOTLDR1":
+                if image_type == "all" or section.attrib['image_type'] == image_type:
+                    ret = self.__gen_flash_script_bootldr(entries, partition, flinfo, script)
+                    if ret == 0:
+                        return 0
+                    continue
 
             if flinfo.type != "emmc" and flinfo.type != "nor":
-		imgs = section.findall('img_name')
-		for img in imgs:
-			memory_attr = img.get('memory')
-			if memory_attr != None and memory_attr == memory_size:
-				filename = img.text;
+                imgs = section.findall('img_name')
+                for img in imgs:
+                    memory_attr = img.get('memory')
+                    if memory_attr != None and memory_attr == memory_size:
+                        filename = img.text;
 
-			atf_image = img.get('atf')
-			if atf_image != None and atf == "true":
-				filename = img.text;
+                    atf_image = img.get('atf')
+                    if atf_image != None and atf == "true":
+                        filename = img.text;
 
-	    else:
-		if partition == "0:WIFIFW":
+            else:
+                if partition == "0:WIFIFW":
 
-                   if ver_check == True:
-                       script.append("qcn_detect", fatal=False)
+                    if ver_check == True:
+                        script.append("qcn_detect", fatal=False)
 
-                   if no_fw_mach_ids and filename != "":
-                       self.__gen_flash_script_update_for_wififw(partition, filename, flinfo, script, no_fw_mach_ids)
+                    if no_fw_mach_ids and filename != "":
+                        self.__gen_flash_script_update_for_wififw(partition, filename, flinfo, script, no_fw_mach_ids)
 
-                   if image_type == "all" or section.attrib['image_type'] == image_type:
-                       for wifi_fw_type in wifi_fw_list:
-                           fw_name = wifi_fw_type
-			   if fw_name == "":
-				continue
-                           ret = self.__gen_flash_script_wififw(entries, partition, fw_name, wifi_fw_type, flinfo, script)
-                           if ret == 0:
-                               return 0
-                           fw_name = ""
-                           wifi_fw_type = ""
+                    if flinfo.type == "emmc":
+                        section_img_type = section.attrib['image_type']
+                    else:
+                        section_img_type = section[8].attrib['image_type']
 
-                   if filename != "":
-                       wifi_fw_list.append(filename)
-                       filename = ""
-		   continue
+                    if image_type == "all" or section_img_type == image_type:
+                        for wifi_fw_type in wifi_fw_list:
+                            fw_name = wifi_fw_type
+                            if fw_name == "":
+                                continue
+                            ret = self.__gen_flash_script_wififw(entries, partition, fw_name, wifi_fw_type, flinfo, script)
+                            if ret == 0:
+                                return 0
+                            fw_name = ""
+                            wifi_fw_type = ""
 
-		if section != None and filename != "" and section.get('filename_mem' + memory_size) != None:
-			filename = section.get('filename_mem' + memory_size)
+                    if filename != "":
+                        if filename not in wifi_fw_list:
+                            wifi_fw_list.append(filename)
+                            filename = ""
+                    continue
 
-		if section != None and atf == "true" and section.get('filename_atf') != None:
-			filename = section.get('filename_atf')
+                if section != None and filename != "" and section.get('filename_mem' + memory_size) != None:
+                    filename = section.get('filename_mem' + memory_size)
+
+                if section != None and atf == "true" and section.get('filename_atf') != None:
+                    filename = section.get('filename_atf')
 
             if filename != "":
                 ret = self.__gen_flash_script_image(parts, parts_length, filename, soc_version, file_exists, machid, partition, flinfo, script)
                 if ret == 0:
                     return 0
 
-	    if self.flash_type in [ "nand", "nand-4k", "norplusnand", "norplusnand-4k" ] and partition == "rootfs":
+            if self.flash_type in [ "nand", "nand-4k", "norplusnand", "norplusnand-4k" ] and partition == "rootfs":
 
                 if ver_check == True:
                     script.append("qcn_detect", fatal=False)
@@ -1075,6 +1200,43 @@ class Pack(object):
 
         return 1
 
+    def __gen_script_bootconfig(self, images, flinfo, part_info, section):
+        global ARCH_NAME
+        fw_imgs = []
+
+        if flinfo.type != "emmc":
+            fw_objs = section.findall('img_name')
+            if (len(fw_objs) <= 1):
+                return 0
+
+            for i in fw_objs:
+                fw_imgs.append(i.text)
+
+        else:
+            if 'bootconfig_type_max' in section.attrib:
+                max_files = int(section.attrib['bootconfig_type_max'])
+            else:
+                return 0;
+
+            for fw_type in range(1, max_files+1):
+                if 'filename_img' + str(fw_type) in section.attrib:
+                    filename = section.attrib['filename_img' + str(fw_type)]
+                    if filename == "":
+                        continue
+                    fw_imgs.append(filename)
+
+        if part_info == None and self.flinfo.type != 'norplusnand':
+            return 0
+
+        for filename in fw_imgs:
+            image_info = ImageInfo(filename[:-4] + "-" + sha1(filename),
+                                   filename, "firmware")
+            if filename.lower() != "none":
+                if image_info not in images:
+                    images.append(image_info)
+
+        return 1
+
     def __gen_script_cdt(self, images, flinfo, root, section_conf, partition):
         global ARCH_NAME
 
@@ -1085,7 +1247,7 @@ class Pack(object):
             board = section.find(".//board").text
             try:
                 memory = section.find(".//memory").text
-            except AttributeError, e:
+            except AttributeError as e:
                 memory = "128M16"
 
             if memory_size != "default":
@@ -1103,7 +1265,7 @@ class Pack(object):
                                    filename, "firmware")
             if filename.lower() != "none":
                 if image_info not in images:
-		    images.append(image_info)
+                    images.append(image_info)
 
     def __gen_script_bootldr(self, images, flinfo, root, section_conf, partition):
         global ARCH_NAME
@@ -1120,7 +1282,7 @@ class Pack(object):
 
             try:
                 memory = section.find(".//memory").text
-            except AttributeError, e:
+            except AttributeError as e:
                 memory = "128M16"
 
             if memory_size != "default":
@@ -1138,7 +1300,7 @@ class Pack(object):
                                    filename, "firmware")
             if filename.lower() != "none":
                 if image_info not in images:
-		    images.append(image_info)
+                    images.append(image_info)
 
     def __find_wifi_fw_ver_combinations(self, filename):
         global wifi_fws_avail
@@ -1159,7 +1321,7 @@ class Pack(object):
                     if (2 == len(possible_fw_vers)):
                         temp_name = filename
                         temp_name = temp_name.replace(possible_fw_vers[0][0][0], a)
-                        temp_name = temp_name.replace(possible_fw_vers[0][1][0], b)
+                        temp_name = temp_name.replace(possible_fw_vers[1][0][0], b)
 
                         if os.path.exists(os.path.join(self.images_dname, temp_name)):
                             if wifi_fws_combs.get(temp_name) == None:
@@ -1170,8 +1332,8 @@ class Pack(object):
                             if (3 == len(possible_fw_vers)):
                                 temp_name = filename
                                 temp_name = temp_name.replace(possible_fw_vers[0][0][0], a)
-                                temp_name = temp_name.replace(possible_fw_vers[0][1][0], b)
-                                temp_name = temp_name.replace(possible_fw_vers[0][2][0], c)
+                                temp_name = temp_name.replace(possible_fw_vers[1][0][0], b)
+                                temp_name = temp_name.replace(possible_fw_vers[2][0][0], c)
 
                                 if os.path.exists(os.path.join(self.images_dname, temp_name)):
                                     if wifi_fws_combs.get(temp_name) == None:
@@ -1182,9 +1344,9 @@ class Pack(object):
                                     if (4 == len(possible_fw_vers)):
                                         temp_name = filename
                                         temp_name = temp_name.replace(possible_fw_vers[0][0][0], a)
-                                        temp_name = temp_name.replace(possible_fw_vers[0][1][0], b)
-                                        temp_name = temp_name.replace(possible_fw_vers[0][2][0], c)
-                                        temp_name = temp_name.replace(possible_fw_vers[0][3][0], d)
+                                        temp_name = temp_name.replace(possible_fw_vers[1][0][0], b)
+                                        temp_name = temp_name.replace(possible_fw_vers[2][0][0], c)
+                                        temp_name = temp_name.replace(possible_fw_vers[3][0][0], d)
 
                                         if os.path.exists(os.path.join(self.images_dname, temp_name)):
                                             if wifi_fws_combs.get(temp_name) == None:
@@ -1197,34 +1359,34 @@ class Pack(object):
 
     def __gen_script_append_images(self, filename, soc_version, wifi_fw_type, images, flinfo, root, section_conf, partition):
 
-	part_info = self.__get_part_info(partition)
-	if part_info == None and self.flinfo.type != 'norplusnand':
-	    return
+        part_info = self.__get_part_info(partition)
+        if part_info == None and self.flinfo.type != 'norplusnand':
+            return
 
-	if section_conf == "qsee":
-	    section_conf = "tz"
-	elif section_conf == "appsbl":
-                print " Using u-boot..."
-	        section_conf = "u-boot"
-	elif section_conf == "rootfs" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
-	    section_conf = "ubi"
-	elif section_conf == "wififw" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
-	    section_conf = "wififw_ubi"
-	elif section_conf == "wififw" and wifi_fw_type:
-	    section_conf = filename[:-13]
+        if section_conf == "qsee":
+            section_conf = "tz"
+        elif section_conf == "appsbl":
+            print(" Using u-boot...")
+            section_conf = "u-boot"
+        elif section_conf == "rootfs" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
+            section_conf = "ubi"
+        elif section_conf == "wififw" and self.flash_type in ["nand", "nand-4k", "norplusnand", "norplusnand-4k"]:
+            section_conf = "wififw_ubi"
+        elif section_conf == "wififw" and wifi_fw_type:
+            section_conf = filename[:-13]
 
-        image_info = ImageInfo(section_conf + "-" + sha1(filename),	filename, "firmware")
+        image_info = ImageInfo(section_conf + "-" + sha1(filename),     filename, "firmware")
         if filename.lower() != "none":
             if image_info not in images:
                 images.append(image_info)
 
     def __gen_script_append_images_wififw_ubi_volume(self, fw_filename, wifi_fw_type, images):
 
-	image_info = ImageInfo(fw_filename[:-13] + "-" + sha1(fw_filename),
-				fw_filename, "firmware")
-	if fw_filename.lower() != "none":
-	    if image_info not in images:
-		images.append(image_info)
+        image_info = ImageInfo(fw_filename[:-13] + "-" + sha1(fw_filename),
+                                fw_filename, "firmware")
+        if fw_filename.lower() != "none":
+            if image_info not in images:
+                images.append(image_info)
 
     def __gen_script(self, script_fp, script, images, flinfo, root):
         """Generate the script to flash the multi-image blob.
@@ -1234,14 +1396,15 @@ class Pack(object):
         script -- Script object, to append the commands to
         images -- list of ImageInfo, appended to, based on images in config
         """
-	global MODE
-	global SRC_DIR
+        global MODE
+        global SRC_DIR
+        global flash_size
 
-	soc_version = 0
-	diff_soc_ver_files = 0
-	wifi_fw_type = ""
-	diff_files = ""
-	file_exists = 1
+        soc_version = 0
+        diff_soc_ver_files = 0
+        wifi_fw_type = ""
+        diff_files = ""
+        file_exists = 1
 
         ret = self.__gen_flash_script(script, flinfo, root, True)
         if ret == 0:
@@ -1251,9 +1414,9 @@ class Pack(object):
             script.end()
 
         if self.flash_type == "norplusemmc" and flinfo.type == "emmc":
-            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + flinfo.type + "-partition.xml"
+            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + flinfo.type + "-partition"+ flash_size +".xml"
         else:
-            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + self.flash_type.lower() + "-partition.xml"
+            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + self.flash_type.lower() + "-partition"+ flash_size +".xml"
 
         root_part = ET.parse(srcDir_part)
         if self.flash_type != "emmc" and flinfo.type != "emmc":
@@ -1301,59 +1464,61 @@ class Pack(object):
                 part_index += 1
                 if flinfo.type != "emmc":
                     try:
-			if image_type == "all" or section[8].attrib['image_type'] == image_type:
+                        if image_type == "all" or section[8].attrib['image_type'] == image_type:
                             filename = section[8].text
-			    try:
-			        if section[8].attrib['mode'] != MODE:
-				    filename = section[9].text
-			    except AttributeError, e:
-			 	pass
-			    except KeyError, e:
-			        pass
-                    except IndexError, e:
+                            try:
+                                if section[8].attrib['mode'] != MODE:
+                                    filename = section[9].text
+                            except AttributeError as e:
+                                pass
+                            except KeyError as e:
+                                pass
+                    except IndexError as e:
                         if index == (parts_length - 1):
                             return
                         else:
                             continue
-                    except KeyError, e:
-			continue
+                    except KeyError as e:
+                        continue
                     partition = section[0].text
 
                 else:
-		    try:
-			diff_files = section.attrib['diff_files']
-		    except KeyError, e:
-			try:
-			    diff_soc_ver_files = section.attrib['diff_soc_ver_files']
-			    partition = section.attrib['label']
-			except KeyError, e:
+                    try:
+                        diff_files = section.attrib['diff_files']
+                    except KeyError as e:
+                        try:
+                            diff_soc_ver_files = section.attrib['diff_soc_ver_files']
+                            partition = section.attrib['label']
+                        except KeyError as e:
                             if tiny_16m == "true":
                                 pass
-			    else:
-				try:
-				    partition = section.attrib['label']
+                            elif "bootconfig_type_max" in section.attrib and image_type == "all":
+                                partition = section.attrib['label']
+                            else:
+                                try:
+                                    partition = section.attrib['label']
                                     if partition != "0:WIFIFW":
-    				        if image_type == "all" or section.attrib['image_type'] == image_type:
-					    filename = section.attrib['filename']
-					    if filename == "":
-					        continue
-				except KeyError, e:
-				    partition = ""
-				    print "Skipping partition '%s'" % section.attrib['label']
-				    pass
+                                        if image_type == "all" or section.attrib['image_type'] == image_type:
+                                            filename = section.attrib['filename']
+                                            if filename == "":
+                                                continue
+                                except KeyError as e:
+                                    partition = ""
+                                    print("Skipping partition '%s'" % section.attrib['label'])
+                                    pass
 
-		    if diff_files == "true":
-			try:
-			      if image_type == "all" or section.attrib['image_type'] == image_type:
-                                  filename = section.attrib['filename_' + MODE]
-                                  partition = section.attrib['label']
-			      if filename == "":
-                                        continue
+                    if diff_files == "true":
+                        try:
+                            if image_type == "all" or section.attrib['image_type'] == image_type:
+                                filename = section.attrib['filename_' + MODE]
+                                partition = section.attrib['label']
+                            if filename == "":
+                                continue
 
-                        except KeyError, e:
-                              print "Skipping partition '%s'" % section.attrib['label']
-			      pass
-			diff_files = "" # Clear for next iteration
+                        except KeyError as e:
+                            print("Skipping partition '%s'" % section.attrib['label'])
+                            pass
+                        diff_files = "" # Clear for next iteration
 
             part_info = self.__get_part_info(partition)
 
@@ -1365,71 +1530,80 @@ class Pack(object):
 
             section_conf = section_conf.lower()
 
+            if section_conf == "bootconfig" or section_conf == "bootconfig1":
+                try:
+                    if image_type == "all" or section[8].attrib['image_type'] == image_type:
+                        ret = self.__gen_script_bootconfig(images, flinfo, part_info, section)
+                        if ret == 1:
+                            continue
+                except KeyError as e:
+                    continue
+
             if section_conf == "cdt" or section_conf == "ddrconfig":
-		try:
-		    if image_type == "all" or section[8].attrib['image_type'] == image_type:
-	                self.__gen_script_cdt(images, flinfo, root, section_conf, partition)
-                	continue
-                except KeyError, e:
+                try:
+                    if image_type == "all" or section[8].attrib['image_type'] == image_type:
+                        self.__gen_script_cdt(images, flinfo, root, section_conf, partition)
+                        continue
+                except KeyError as e:
                     continue
 
             if section_conf == "bootldr1":
-		try:
-		    if image_type == "all" or section[8].attrib['image_type'] == image_type:
-	                self.__gen_script_bootldr(images, flinfo, root, section_conf, partition)
-			continue
-                except KeyError, e:
+                try:
+                    if image_type == "all" or section[8].attrib['image_type'] == image_type:
+                        self.__gen_script_bootldr(images, flinfo, root, section_conf, partition)
+                        continue
+                except KeyError as e:
                     continue
 
             if flinfo.type != "emmc":
-		imgs = section.findall('img_name')
-		for img in imgs:
-			memory_attr = img.get('memory')
-			if memory_attr != None and memory_attr == memory_size:
-				filename = img.text;
+                imgs = section.findall('img_name')
+                for img in imgs:
+                    memory_attr = img.get('memory')
+                    if memory_attr != None and memory_attr == memory_size:
+                        filename = img.text;
 
-			atf_image = img.get('atf')
-			if atf_image != None and atf == "true":
-				filename = img.text;
+                    atf_image = img.get('atf')
+                    if atf_image != None and atf == "true":
+                        filename = img.text;
 
             else:
-		# wififw images specific for RDP based on machid
-		if section_conf == "wififw":
-                    if ver_check:
-                        for k, v in wifi_fws_avail.iteritems():
-            		    self.__gen_script_append_images(k, soc_version, 1, images, flinfo, root, section_conf, partition)
-                    else:
-                        for wifi_fw_type in wifi_fw_list:
-                            fw_name = wifi_fw_type
-                            if fw_name == "":
-	    		        continue
-			    if not os.path.exists(os.path.join(self.images_dname, fw_name)):
-                                return 0
-            		    self.__gen_script_append_images(fw_name, soc_version, wifi_fw_type, images, flinfo, root, section_conf, partition)
-			wifi_fw_type = ""
-                        fw_name = ""
+                if section != None and filename != "" and section.get('filename_mem' + memory_size) != None:
+                    filename = section.get('filename_mem' + memory_size)
 
-		    continue
+                if section != None and atf == "true" and section.get('filename_atf') != None:
+                    filename = section.get('filename_atf')
 
-		if section != None and filename != "" and section.get('filename_mem' + memory_size) != None:
-			filename = section.get('filename_mem' + memory_size)
+            # wififw images specific for RDP based on machid
+            if self.flash_type in [ "emmc" , "norplusemmc" , "tiny-nor", "tiny-nor-debug", "nor" ] and section_conf == "wififw":
+                if ver_check:
+                    for k, v in wifi_fws_avail.items():
+                        self.__gen_script_append_images(k, soc_version, 1, images, flinfo, root, section_conf, partition)
+                else:
+                    for wifi_fw_type in wifi_fw_list:
+                        fw_name = wifi_fw_type
+                        if fw_name == "":
+                            continue
+                        if not os.path.exists(os.path.join(self.images_dname, fw_name)):
+                            return 0
+                        self.__gen_script_append_images(fw_name, soc_version, wifi_fw_type, images, flinfo, root, section_conf, partition)
+                    wifi_fw_type = ""
+                    fw_name = ""
 
-		if section != None and atf == "true" and section.get('filename_atf') != None:
-			filename = section.get('filename_atf')
+                continue
 
             if filename != "":
                 self.__gen_script_append_images(filename, soc_version, wifi_fw_type, images, flinfo, root, section_conf, partition)
 
-	    if self.flash_type in [ "nand", "nand-4k", "norplusnand", "norplusnand-4k" ] and section_conf == "rootfs":
+            if self.flash_type in [ "nand", "nand-4k", "norplusnand", "norplusnand-4k" ] and section_conf == "rootfs":
                 if ver_check:
-                    for k, v in wifi_fws_avail.iteritems():
-		        self.__gen_script_append_images_wififw_ubi_volume(k, wifi_fw_type, images)
+                    for k, v in wifi_fws_avail.items():
+                        self.__gen_script_append_images_wififw_ubi_volume(k, wifi_fw_type, images)
                 else:
                     for wifi_fw_type in wifi_fw_list:
                         filename = wifi_fw_type
                         if filename == "":
                             continue
-		        ret = self.__gen_script_append_images_wififw_ubi_volume(filename, wifi_fw_type, images)
+                        ret = self.__gen_script_append_images_wififw_ubi_volume(filename, wifi_fw_type, images)
                         if ret == 0:
                             return 0
                         filename = ""
@@ -1446,7 +1620,7 @@ class Pack(object):
         """
         try:
             its_fp = open(self.its_fname, "wb")
-        except IOError, e:
+        except IOError as e:
             error("error opening its file '%s'" % self.its_fname, e)
 
         desc = "Flashing %s %x %x"
@@ -1462,6 +1636,8 @@ class Pack(object):
         image_data = "".join(image_data)
         its_data = its_tmpl.substitute(desc=desc, images=image_data)
 
+        if sys.version_info.major >= 3:
+            its_data = bytes(its_data, 'utf-8')
         its_fp.write(its_data)
         its_fp.close()
 
@@ -1469,9 +1645,9 @@ class Pack(object):
             cmd = [SRC_DIR + "/mkimage", "-f", self.its_fname, self.img_fname]
             ret = subprocess.call(cmd)
             if ret != 0:
-                print ret
+                print(ret)
                 error("failed to create u-boot image from script")
-        except OSError, e:
+        except OSError as e:
             error("error executing mkimage", e)
 
     def __create_fnames(self):
@@ -1481,8 +1657,9 @@ class Pack(object):
         self.its_fname = os.path.join(self.images_dname, "flash.its")
 
     def __gen_board_script(self, flinfo, part_fname, images, root):
-	global SRC_DIR
-	global ARCH_NAME
+        global SRC_DIR
+        global ARCH_NAME
+        global flash_size
 
         """Generate the flashing script for one board.
 
@@ -1512,10 +1689,7 @@ class Pack(object):
             blocks_per_chip = int(flash_param.find(".//total_block").text)
             chipsize = blocks_per_chip * blocksize
 
-            srcDir_part = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + flinfo.type + "-partition.xml"
-            root_part = ET.parse(srcDir_part)
-
-            mibib = MIBIB(part_fname, flinfo, blocksize, chipsize, root_part)
+            mibib = MIBIB(part_fname, flinfo, blocksize, chipsize)
             self.partitions = mibib.get_parts()
 
         else:
@@ -1523,12 +1697,12 @@ class Pack(object):
             self.partitions = gpt.get_parts()
 
         ret = self.__gen_script(script_fp, script, images, flinfo, root)
-	if ret == 0:
-	    return 0
+        if ret == 0:
+            return 0
 
         try:
             script_fp.write(script.dumps())
-        except IOError, e:
+        except IOError as e:
             error("error writing to script '%s'" % script_fp.name, e)
 
         script_fp.close()
@@ -1560,25 +1734,26 @@ class Pack(object):
             if ftype.lower() == "norplusemmc":
                 ftype = "emmc"
 
-        except ValueError, e:
+        except ValueError as e:
             error("invalid flash info in section '%s'" % board_section.find('machid').text, e)
 
         flinfo = FlashInfo(ftype, pagesize, blocksize, chipsize)
 
         ret = self.__gen_board_script(flinfo, part_fname, images, root)
-	if ret == 0:
+        if ret == 0:
             return 0
 
         return 1
 
     def __process_board_flash(self, ftype, images, root):
-	global SRC_DIR
-	global ARCH_NAME
-	global MODE
+        global SRC_DIR
+        global ARCH_NAME
+        global MODE
+        global flash_size
 
         try:
             if ftype == "tiny-nor" or ftype == "tiny-nor-debug":
-                part_info = root.find(".//data[@type='" + "NOR_PARAMETER']")
+                part_info = root.find(".//data[@type='" + "TINY_NOR_PARAMETER']")
             elif ftype in ["nand", "nand-4k"]:
                 if root.find(".//data[@type='NAND_PARAMETER']/entry") != None:
                     if ftype == "nand":
@@ -1594,7 +1769,7 @@ class Pack(object):
 
             MODE_APPEND = "_64" if MODE == "64" else ""
 
-            UBINIZE_CFG_NAME = ARCH_NAME + "-ubinize" + MODE_APPEND + ".cfg"
+            UBINIZE_CFG_NAME = ARCH_NAME + "-ubinize" + MODE_APPEND + flash_size +".cfg"
 
             f1 = open(SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + UBINIZE_CFG_NAME, 'r')
             UBINIZE_CFG_NAME = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/tmp-" + UBINIZE_CFG_NAME
@@ -1604,40 +1779,40 @@ class Pack(object):
             f1.close()
             f2.close()
 
-            part_file = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + ftype + "-partition.xml"
+            part_file = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + ftype + "-partition"+ flash_size +".xml"
             parts = ET.parse(part_file).findall('.//partitions/partition')
             for index in range(len(parts)):
-                    section = parts[index]
-                    if section[0].text == "rootfs":
-                        rootfs_pos = 9 if MODE == "64" else 8
-                        UBI_IMG_NAME = section[rootfs_pos].text
+                section = parts[index]
+                if section[0].text == "rootfs":
+                    rootfs_pos = 9 if MODE == "64" else 8
+                    UBI_IMG_NAME = section[rootfs_pos].text
 
             if ftype in ["nand-4k", "norplusnand-4k"]:
                 cmd = '%s -m 4096 -p 256KiB -o root.ubi %s' % ((SRC_DIR + "/ubinize") ,UBINIZE_CFG_NAME)
                 ret = subprocess.call(cmd, shell=True)
                 if ret != 0:
-                     error("ubinization got failed")
+                    error("ubinization got failed")
                 cmd = 'dd if=root.ubi of=%s bs=4k conv=sync' % (SRC_DIR + "/" + UBI_IMG_NAME)
                 ret = subprocess.call(cmd, shell=True)
                 if ret != 0:
-                     error("ubi image copy operation failed")
+                    error("ubi image copy operation failed")
 
             elif ftype in ["nand", "norplusnand"]:
                 cmd = '%s -m 2048 -p 128KiB -o root.ubi %s' % ((SRC_DIR + "/ubinize") ,UBINIZE_CFG_NAME)
                 ret = subprocess.call(cmd, shell=True)
                 if ret != 0:
-                     error("ubinization got failed")
+                    error("ubinization got failed")
                 cmd = 'dd if=root.ubi of=%s bs=2k conv=sync' % (SRC_DIR + "/" + UBI_IMG_NAME)
                 ret = subprocess.call(cmd, shell=True)
                 if ret != 0:
-                     error("ubi image copy operation failed")
+                    error("ubi image copy operation failed")
 
-            part_file = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + ftype + "-partition.xml"
+            part_file = SRC_DIR + "/" + ARCH_NAME + "/flash_partition/" + ftype + "-partition"+ flash_size +".xml"
             part_xml = ET.parse(part_file)
-	    if (part_xml.find(".//partitions/partition[name='0:MIBIB']")):
-		partition = part_xml.find(".//partitions/partition[name='0:MIBIB']")
-	    else:
-		partition = part_xml.find(".//partitions/partition[2]")
+            if (part_xml.find(".//partitions/partition[name='0:MIBIB']")):
+                partition = part_xml.find(".//partitions/partition[name='0:MIBIB']")
+            else:
+                partition = part_xml.find(".//partitions/partition[2]")
             part_fname = partition[8].text
             part_fname = os.path.join(self.images_dname, part_fname)
             pagesize = int(part_info.find(".//page_size").text)
@@ -1649,7 +1824,7 @@ class Pack(object):
             if ftype in ["nand-4k"]:
                 ftype = "nand"
 
-        except ValueError, e:
+        except ValueError as e:
             error("invalid flash info in section '%s'" % board_section.find('machid').text, e)
 
         blocksize = pages_per_block * pagesize
@@ -1658,7 +1833,7 @@ class Pack(object):
         flinfo = FlashInfo(ftype, pagesize, blocksize, chipsize)
 
         ret = self.__gen_board_script(flinfo, part_fname, images, root)
-	return ret
+        return ret
 
     def __process_board(self, images, root):
 
@@ -1669,10 +1844,10 @@ class Pack(object):
                 ret = self.__process_board_flash_emmc(self.flash_type, images, root)
             elif self.flash_type == "norplusemmc":
                 ret = self.__process_board_flash("norplusemmc", images, root)
-		if ret:
+                if ret:
                     ret = self.__process_board_flash_emmc("norplusemmc", images, root)
             return ret
-        except ValueError, e:
+        except ValueError as e:
             error("error getting board info in section '%s'" % board_section.find('machid').text, e)
 
     def main_bconf(self, flash_type, images_dname, out_fname, root):
@@ -1689,7 +1864,7 @@ class Pack(object):
         self.__create_fnames()
         try:
             os.unlink(self.scr_fname)
-        except OSError, e:
+        except OSError as e:
             pass
 
         images = []
@@ -1698,7 +1873,7 @@ class Pack(object):
             images.insert(0, ImageInfo("script", "flash.scr", "script"))
             self.__mkimage(images)
         else:
-	    fail_img = out_fname.split("/")
+            fail_img = out_fname.split("/")
             error("Failed to pack %s" % fail_img[-1])
 
 class UsageError(Exception):
@@ -1718,47 +1893,52 @@ class ArgParser(object):
         self.its_fname = None
 
     def parse(self, argv):
-	global MODE
-	global SRC_DIR
-	global ARCH_NAME
-	global image_type
-	global memory_size
+        global MODE
+        global SRC_DIR
+        global ARCH_NAME
+        global image_type
+        global memory_size
         global atf
         global skip_4k_nand
+        global flash_size
+        flash_size = ""
 
         """Start the parsing process, and populate members with parsed value.
 
         argv -- list of string, the command line arguments
         """
 
-	cdir = os.path.abspath(os.path.dirname(""))
+        cdir = os.path.abspath(os.path.dirname(""))
         if len(sys.argv) > 1:
             try:
-                opts, args = getopt(sys.argv[1:], "", ["arch=", "fltype=", "srcPath=", "inImage=", "outImage=", "image_type=", "memory=", "skip_4k_nand", "atf"])
-            except GetoptError, e:
-		raise UsageError(e.msg)
+                opts, args = getopt(sys.argv[1:], "", ["arch=", "fltype=", "srcPath=", "inImage=", "outImage=", "image_type=", "memory=", "flash_size=", "skip_4k_nand", "atf"])
+            except GetoptError as e:
+                raise UsageError(e.msg)
 
-	    for option, value in opts:
-		if option == "--arch":
-		    ARCH_NAME = value
+            for option, value in opts:
+                if option == "--arch":
+                    ARCH_NAME = value
 
-		elif option == "--fltype":
-		    self.flash_type = value
+                elif option == "--fltype":
+                    self.flash_type = value
 
-		elif option == "--srcPath":
-		    SRC_DIR = os.path.abspath(value)
+                elif option == "--srcPath":
+                    SRC_DIR = os.path.abspath(value)
 
-		elif option == "--inImage":
-		    self.images_dname = os.path.join(cdir, value)
+                elif option == "--inImage":
+                    self.images_dname = os.path.join(cdir, value)
 
-		elif option == "--outImage":
-		    self.out_dname = os.path.join(cdir, value)
+                elif option == "--outImage":
+                    self.out_dname = os.path.join(cdir, value)
 
-		elif option == "--image_type":
-		    image_type = value
+                elif option == "--image_type":
+                    image_type = value
 
                 elif option == "--memory":
                     memory_size = value
+
+                elif option == "--flash_size":
+                    flash_size = "-" + value
 
                 elif option =="--atf":
                     atf = "true"
@@ -1769,62 +1949,63 @@ class ArgParser(object):
 #Verify Arguments passed by user
 
 # Verify arch type
-	    if ARCH_NAME not in supported_arch:
-		raise UsageError("Invalid arch type '%s'" % arch)
+            if ARCH_NAME not in supported_arch:
+                raise UsageError("Invalid arch type '%s'" % arch)
 
-	    MODE = "32"
-	    if ARCH_NAME[-3:] == "_64":
-		MODE = "64"
+            MODE = "32"
+            if ARCH_NAME[-3:] == "_64":
+                MODE = "64"
                 ARCH_NAME = ARCH_NAME[:-3]
 
 # Set flash type to default type (nand) if not given by user
-	    if self.flash_type == None:
+            if self.flash_type == None:
                 self.flash_type = ArgParser.DEFAULT_TYPE
-	    for flash_type in self.flash_type.split(","):
+            for flash_type in self.flash_type.split(","):
                 if flash_type not in [ "nand", "nor", "tiny-nor", "emmc", "norplusnand", "norplusemmc", "tiny-nor-debug" ]:
                     raise UsageError("invalid flash type '%s'" % flash_type)
 
 # Verify src Path
-	    if SRC_DIR == "":
-		raise UsageError("Source Path is not provided")
+            if SRC_DIR == "":
+                raise UsageError("Source Path is not provided")
 
 #Verify input image path
-	    if self.images_dname == None:
-		raise UsageError("input images' Path is not provided")
+            if self.images_dname == None:
+                raise UsageError("input images' Path is not provided")
 
 #Verify Output image path
-	    if self.out_dname == None:
-		raise UsageError("Output Path is not provided")
+            if self.out_dname == None:
+                raise UsageError("Output Path is not provided")
 
     def usage(self, msg):
         """Print error message and command usage information.
 
         msg -- string, the error message
         """
-        print "pack: %s" % msg
-        print
-        print "Usage:"
-	print "python pack_hk.py [options] [Value] ..."
-	print
-        print "options:"
-        print "  --arch \tARCH_TYPE [" + '/'.join(supported_arch) + "]"
-	print "  --fltype \tFlash Type [nor/tiny-nor/nand/emmc/norplusnand/norplusemmc/tiny-nor-debug]"
-        print " \t\tMultiple flashtypes can be passed by a comma separated string"
-        print " \t\tDefault is all. i.e If \"--fltype\" is not passed image for all the flash-type will be created.\n"
-        print "  --srcPath \tPath to the directory containg the meta scripts and configs"
-	print
-	print "  --inImage \tPath to the direcory containg binaries and images needed for singleimage"
-	print
-        print "  --outImage \tPath to the directory where single image will be generated"
-        print
-        print "  --memory \tMemory size for low memory profile"
-        print " \t\tIf it is not specified CDTs with default memory size are taken for single-image packing.\n"
-        print " \t\tIf specified, CDTs created with specified memory size will be used for single-image.\n"
-        print
-        print "  --atf \t\tReplace tz with atf for QSEE partition"
-        print "  --skip_4k_nand \tskip generating 4k nand images"
-        print " \t\tThis Argument does not take any value"
-        print "Pack Version: %s" % version
+        print("pack: %s" % msg)
+        print()
+        print("Usage:")
+        print("python pack_v2.py [options] [Value] ...")
+        print()
+        print("options:")
+        print("  --arch \tARCH_TYPE [" + '/'.join(supported_arch) + "]")
+        print("  --fltype \tFlash Type [nor/tiny-nor/nand/emmc/norplusnand/norplusemmc/tiny-nor-debug]")
+        print(" \t\tMultiple flashtypes can be passed by a comma separated string")
+        print(" \t\tDefault is all. i.e If \"--fltype\" is not passed image for all the flash-type will be created.\n")
+        print("  --srcPath \tPath to the directory containg the meta scripts and configs")
+        print()
+        print("  --inImage \tPath to the direcory containg binaries and images needed for singleimage")
+        print()
+        print("  --outImage \tPath to the directory where single image will be generated")
+        print()
+        print("  --memory \tMemory size for low memory profile")
+        print(" \t\tIf it is not specified CDTs with default memory size are taken for single-image packing.\n")
+        print(" \t\tIf specified, CDTs created with specified memory size will be used for single-image.\n")
+        print("  --flash_size \tFlash size")
+        print()
+        print("  --atf \t\tReplace tz with atf for QSEE partition")
+        print("  --skip_4k_nand \tskip generating 4k nand images")
+        print(" \t\tThis Argument does not take any value")
+        print("Pack Version: %s" % version)
 
 def main():
     """Main script entry point.
@@ -1837,14 +2018,14 @@ def main():
     try:
         parser = ArgParser()
         parser.parse(sys.argv)
-    except UsageError, e:
+    except UsageError as e:
         parser.usage(e.args[0])
         sys.exit(1)
 
     pack = Pack()
 
     if not os.path.exists(parser.out_dname):
-	os.makedirs(parser.out_dname)
+        os.makedirs(parser.out_dname)
 
     config = SRC_DIR + "/" + ARCH_NAME + "/config.xml"
     root = ET.parse(config)
@@ -1857,6 +2038,7 @@ def main():
         global def_ver_list
         global possible_fw_vers
         global wifi_fws_avail
+        global flash_size
 
         wifi_fws_avail = dict()
         ver_check = True
@@ -1865,7 +2047,7 @@ def main():
         def_ver_list = list(map(int, def_ver_list))
 
         if len(soc_ver_list) != len(def_ver_list):
-	    print "Invalid VERSION_PARAMETER!!! Please check " + config + " file."
+            print("Invalid VERSION_PARAMETER!!! Please check " + config + " file.")
             sys.exit(1)
 
         possible_fw_vers = []
@@ -1887,28 +2069,28 @@ def main():
             possible_fw_vers.append(temp)
 
     if skip_4k_nand != "true":
-	# Add nand-4k flash type, if nand flash type is specified
-	if "nand" in parser.flash_type.split(","):
+        # Add nand-4k flash type, if nand flash type is specified
+        if "nand" in parser.flash_type.split(",") and flash_size == "":
             if root.find(".//data[@type='NAND_PARAMETER']/entry") != None:
-		parser.flash_type = parser.flash_type + ",nand-4k"
+                parser.flash_type = parser.flash_type + ",nand-4k"
 
-	# Add norplusnand-4k flash type, if norplusnand flash type is specified
-	if "norplusnand" in parser.flash_type.split(","):
+        # Add norplusnand-4k flash type, if norplusnand flash type is specified
+        if "norplusnand" in parser.flash_type.split(",") and flash_size == "":
             if root.find(".//data[@type='NAND_PARAMETER']/entry") != None:
-		parser.flash_type = parser.flash_type + ",norplusnand-4k"
+                parser.flash_type = parser.flash_type + ",norplusnand-4k"
 
 # Format the output image name from Arch, flash type and mode
     for flash_type in parser.flash_type.split(","):
-	if (flash_type == "tiny-nor" or flash_type == "tiny-nor-debug"):
-	    tiny_16m = "true"
-	else:
-	    tiny_16m = "false"
+        if (flash_type == "tiny-nor" or flash_type == "tiny-nor-debug"):
+            tiny_16m = "true"
+        else:
+            tiny_16m = "false"
 
         MODE_APPEND = "_64" if MODE == "64" else ""
         if image_type == "hlos":
-            suffix = "-apps.img"
+            suffix = "-apps"+ flash_size + ".img"
         else:
-            suffix = "-single.img"
+            suffix = "-single" + flash_size + ".img"
 
         parser.out_fname = flash_type + "-" + ARCH_NAME + MODE_APPEND + suffix
 

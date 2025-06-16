@@ -743,6 +743,7 @@ const u32 *fdtdec_locate_array(const void *blob, int node,
  */
 int fdtdec_get_bool(const void *blob, int node, const char *prop_name);
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 /**
  * Look in the FDT for a config item with the given name and return its value
  * as a 32-bit integer. The property must have at least 4 bytes of data. The
@@ -755,6 +756,7 @@ int fdtdec_get_bool(const void *blob, int node, const char *prop_name);
  */
 int fdtdec_get_config_int(const void *blob, const char *prop_name,
 		int default_val);
+#endif
 
 /**
  * Look in the FDT for a config item with the given name
@@ -766,6 +768,7 @@ int fdtdec_get_config_int(const void *blob, const char *prop_name,
  */
 int fdtdec_get_config_bool(const void *blob, const char *prop_name);
 
+#ifndef CONFIG_REDUCE_FOOTPRINT
 /**
  * Look in the FDT for a config item with the given name and return its value
  * as a string.
@@ -775,6 +778,7 @@ int fdtdec_get_config_bool(const void *blob, const char *prop_name);
  * @returns property string, NULL on error.
  */
 char *fdtdec_get_config_string(const void *blob, const char *prop_name);
+#endif
 
 /*
  * Look up a property in a node and return its contents in a byte
