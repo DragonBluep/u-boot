@@ -39,6 +39,8 @@
 
 #ifndef USE_HOSTCC
 
+extern void board_usb_deinit(int id);
+
 DECLARE_GLOBAL_DATA_PTR;
 
 static const void *boot_get_kernel(cmd_tbl_t *cmdtp, int flag, int argc,
@@ -334,6 +336,11 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 	*load_end = load;
 	print_decomp_msg(comp, type, load == image_start);
 
+#if defined(CONFIG_DTB_COMPRESSION)
+	if(type == IH_TYPE_FLATDT)
+		unc_len = CONFIG_DTB_LOAD_MAXLEN;
+#endif
+
 	/*
 	 * Load the image to the right place, decompressing if needed. After
 	 * this, image_len will be set to the number of uncompressed bytes
@@ -413,8 +420,8 @@ int bootm_decomp_image(int comp, ulong load, ulong image_start, int type,
 }
 
 #ifndef USE_HOSTCC
-static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
-			 int boot_progress)
+int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
+		  int boot_progress)
 {
 	image_info_t os = images->os;
 	ulong load = os.load;
@@ -437,8 +444,10 @@ static int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
 	}
 	flush_cache(load, (*load_end - load) * sizeof(ulong));
 
-	debug("   kernel loaded at 0x%08lx, end = 0x%08lx\n", load, *load_end);
-	bootstage_mark(BOOTSTAGE_ID_KERNEL_LOADED);
+	debug("   %s loaded at 0x%08lx, end = 0x%08lx\n",
+	      genimg_get_type_name(os.type), load, *load_end);
+	if (os.type == IH_TYPE_KERNEL)
+		bootstage_mark(BOOTSTAGE_ID_KERNEL_LOADED);
 
 	no_overlap = (os.comp == IH_COMP_NONE && load == image_start);
 
@@ -588,14 +597,20 @@ static void fixup_silent_linux(void)
  *	then the intent is to boot an OS, so this function will not return
  *	unless the image type is standalone.
  */
+void handle_noc_err(void);
 int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 		    int states, bootm_headers_t *images, int boot_progress)
 {
 	boot_os_fn *boot_fn;
 	ulong iflag = 0;
 	int ret = 0, need_boot_fn;
+#ifdef CONFIG_USB_XHCI_IPQ
+	unsigned int i;
+#endif
 
 	images->state |= states;
+
+	handle_noc_err();
 
 	/*
 	 * Work through the states and see how far we get. We stop on
@@ -695,9 +710,17 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 	}
 
 	/* Now run the OS! We hope this doesn't return */
-	if (!ret && (states & BOOTM_STATE_OS_GO))
+	if (!ret && (states & BOOTM_STATE_OS_GO)) {
+		board_pci_deinit();
+
+#ifdef CONFIG_USB_XHCI_IPQ
+		usb_stop();
+		for (i = 0; i < CONFIG_USB_MAX_CONTROLLER_COUNT; i++)
+			board_usb_deinit(i);
+#endif
 		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_GO,
 				images, boot_fn);
+	}
 
 	/* Deal with any fallout */
 err:
@@ -891,7 +914,7 @@ void memmove_wd(void *to, void *from, size_t len, ulong chunksz)
 	memmove(to, from, len);
 }
 
-static int bootm_host_load_image(const void *fit, int req_image_type)
+static int bootm_host_load_image(const void *fit, int req_image_type, int cfg_noffset)
 {
 	const char *fit_uname_config = NULL;
 	ulong data, len;
@@ -903,6 +926,7 @@ static int bootm_host_load_image(const void *fit, int req_image_type)
 	void *load_buf;
 	int ret;
 
+	fit_uname_config = fdt_get_name(fit, cfg_noffset, NULL);
 	memset(&images, '\0', sizeof(images));
 	images.verify = 1;
 	noffset = fit_image_load(&images, (ulong)fit,
@@ -947,7 +971,7 @@ int bootm_host_load_images(const void *fit, int cfg_noffset)
 	for (i = 0; i < ARRAY_SIZE(image_types); i++) {
 		int ret;
 
-		ret = bootm_host_load_image(fit, image_types[i]);
+		ret = bootm_host_load_image(fit, image_types[i], cfg_noffset);
 		if (!err && ret && ret != -ENOENT)
 			err = ret;
 	}

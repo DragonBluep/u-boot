@@ -423,14 +423,26 @@ static int reserve_round_4k(void)
 		defined(CONFIG_ARM)
 static int reserve_mmu(void)
 {
-	/* reserve TLB table */
-	gd->arch.tlb_size = PGTABLE_SIZE;
-	gd->relocaddr -= gd->arch.tlb_size;
+	/* If relocation is skipped, there is no need to use relocaddr
+	 * as base for tlb
+	 */
+	if (gd->flags & GD_FLG_SKIP_RELOC) {
+		/* reserve TLB table */
+		gd->arch.tlb_size = PGTABLE_SIZE;
+		gd->arch.tlb_addr = CONFIG_SYS_TEXT_BASE + gd->mon_len;
+		gd->arch.tlb_addr += (0x10000 - 1);
+		gd->arch.tlb_addr &= ~(0x10000 - 1);
+	} else {
+		/* reserve TLB table */
+		gd->arch.tlb_size = PGTABLE_SIZE;
+		gd->relocaddr -= gd->arch.tlb_size;
 
-	/* round down to next 64 kB limit */
-	gd->relocaddr &= ~(0x10000 - 1);
+		/* round down to next 64 kB limit */
+		gd->relocaddr &= ~(0x10000 - 1);
 
-	gd->arch.tlb_addr = gd->relocaddr;
+		gd->arch.tlb_addr = gd->relocaddr;
+	}
+
 	debug("TLB table from %08lx to %08lx\n", gd->arch.tlb_addr,
 	      gd->arch.tlb_addr + gd->arch.tlb_size);
 	return 0;
@@ -478,6 +490,12 @@ static int reserve_video(void)
 
 static int reserve_uboot(void)
 {
+	/* If relocation is disabled then no need to relocate stack too */
+	if (gd->flags & GD_FLG_SKIP_RELOC) {
+		gd->start_addr_sp = CONFIG_SYS_TEXT_BASE;
+		return 0;
+	}
+
 	/*
 	 * reserve memory for U-Boot code, data & bss
 	 * round down to next 4 kB limit
@@ -511,7 +529,11 @@ static int reserve_malloc(void)
 static int reserve_board(void)
 {
 	if (!gd->bd) {
+		if (gd->flags & GD_FLG_SKIP_RELOC)
+			gd->start_addr_sp -= 0x40;
+
 		gd->start_addr_sp -= sizeof(bd_t);
+		gd->start_addr_sp = ALIGN(gd->start_addr_sp, 16);
 		gd->bd = (bd_t *)map_sysmem(gd->start_addr_sp, sizeof(bd_t));
 		memset(gd->bd, '\0', sizeof(bd_t));
 		debug("Reserving %zu Bytes for Board Info at: %08lx\n",
@@ -531,16 +553,23 @@ static int setup_machine(void)
 
 static int reserve_global_data(void)
 {
-	gd->start_addr_sp -= sizeof(gd_t);
+	gd->start_addr_sp -= GENERATED_GBL_DATA_SIZE;
 	gd->new_gd = (gd_t *)map_sysmem(gd->start_addr_sp, sizeof(gd_t));
 	debug("Reserving %zu Bytes for Global Data at: %08lx\n",
 			sizeof(gd_t), gd->start_addr_sp);
+
+	if (gd->flags & GD_FLG_SKIP_RELOC)
+		gd->start_addr_sp -= CONFIG_SYS_MALLOC_F_LEN;
+
 	return 0;
 }
 
 static int reserve_fdt(void)
 {
 #ifndef CONFIG_OF_EMBED
+	/* If relocation is disabled, lets not relocate FDT too */
+	if (gd->flags & GD_FLG_SKIP_RELOC)
+		return 0;
 	/*
 	 * If the device tree is sitting immediately above our image then we
 	 * must relocate it. If it is embedded in the data section, then it
@@ -707,6 +736,9 @@ static int reloc_fdt(void)
 static int setup_reloc(void)
 {
 	if (gd->flags & GD_FLG_SKIP_RELOC) {
+		gd->relocaddr = CONFIG_SYS_TEXT_BASE;
+		gd->reloc_off = gd->relocaddr - CONFIG_SYS_TEXT_BASE;
+
 		debug("Skipping relocation due to flag\n");
 		return 0;
 	}
@@ -730,6 +762,13 @@ static int setup_reloc(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_OF_BOARD_FIXUP
+static int fix_fdt(void)
+{
+	return board_fix_fdt((void *)gd->fdt_blob);
+}
+#endif
 
 /* ARM calls relocate_code from its crt0.S */
 #if !defined(CONFIG_ARM) && !defined(CONFIG_SANDBOX)
@@ -810,12 +849,15 @@ static init_fnc_t init_sequence_f[] = {
 #endif
 	setup_mon_len,
 #ifdef CONFIG_OF_CONTROL
+#ifdef CONFIG_COMPRESSED_DTB_BASE
+	initf_pre_malloc,
+#endif
 	fdtdec_setup,
 #endif
+	initf_malloc,
 #ifdef CONFIG_TRACE
 	trace_early_init,
 #endif
-	initf_malloc,
 	initf_console_record,
 #if defined(CONFIG_MPC85xx) || defined(CONFIG_MPC86xx)
 	/* TODO: can this go into arch_cpu_init()? */
@@ -992,6 +1034,9 @@ static init_fnc_t init_sequence_f[] = {
 #ifdef CONFIG_SYS_EXTBDINFO
 	setup_board_extra,
 #endif
+#ifdef CONFIG_OF_BOARD_FIXUP
+	fix_fdt,
+#endif
 	INIT_FUNC_WATCHDOG_RESET
 	reloc_fdt,
 	setup_reloc,
@@ -1029,6 +1074,10 @@ void board_init_f(ulong boot_flags)
 
 	gd->flags = boot_flags;
 	gd->have_console = 0;
+
+#if defined(CONFIG_IPQ_NO_RELOC)
+	gd->flags |= GD_FLG_SKIP_RELOC;
+#endif
 
 	if (initcall_run_list(init_sequence_f))
 		hang();

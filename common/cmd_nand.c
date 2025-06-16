@@ -415,7 +415,8 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		}
 
 		dev = (int)simple_strtoul(argv[2], NULL, 10);
-		set_dev(dev);
+		if (set_dev(dev))
+			return 1;
 
 		return 0;
 	}
@@ -446,6 +447,19 @@ static int do_nand(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				printf("  %08llx\n", (unsigned long long)off);
 		return 0;
 	}
+
+#ifdef READ_ONFI_PAGE_PARA
+	if (strcmp(cmd, "onfipara") == 0) {
+		if (onfi_para.size == 0) {
+			printf("\n Non-ONFI device found.\n");
+			return 0;
+		}
+		printf("\n**************ONFI PARAMETER PAGE*************\n");
+		Read_onfi_ParameterPage_DataStructure(onfi_para.buffer, onfi_para.size);
+		printf("\n********************END***********************\n");
+		return 0;
+	}
+#endif
 
 	/*
 	 * Syntax is:
@@ -772,6 +786,9 @@ static char nand_help_text[] =
 	"nand erase.part [clean] partition - erase entire mtd partition'\n"
 	"nand erase.chip [clean] - erase entire chip'\n"
 	"nand bad - show bad blocks\n"
+#ifdef READ_ONFI_PAGE_PARA
+	"nand onfipara - Read entire onfi parameter page data structure\n"
+#endif
 	"nand dump[.oob] off - dump page\n"
 #ifdef CONFIG_CMD_NAND_TORTURE
 	"nand torture off - torture block at offset\n"
@@ -871,14 +888,14 @@ static int nand_load_image(cmd_tbl_t *cmdtp, nand_info_t *nand,
 
 #if defined(CONFIG_FIT)
 	/* This cannot be done earlier, we need complete FIT image in RAM first */
-	if (genimg_get_format ((void *)addr) == IMAGE_FORMAT_FIT) {
-		if (!fit_check_format (fit_hdr)) {
+	if (fit_hdr && genimg_get_format((void *)addr) == IMAGE_FORMAT_FIT) {
+		if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 			bootstage_error(BOOTSTAGE_ID_NAND_FIT_READ);
-			puts ("** Bad FIT image format\n");
+			puts("** Bad FIT image format\n");
 			return 1;
 		}
 		bootstage_mark(BOOTSTAGE_ID_NAND_FIT_READ_OK);
-		fit_print_contents (fit_hdr);
+		fit_print_contents(fit_hdr);
 	}
 #endif
 

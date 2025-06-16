@@ -150,7 +150,11 @@ extern char *env_name_spec;
 /* Make sure the payload is multiple of AES block size */
 #define ENV_SIZE ((CONFIG_ENV_SIZE - ENV_HEADER_SIZE) & ~(16 - 1))
 #else
-#define ENV_SIZE (CONFIG_ENV_SIZE - ENV_HEADER_SIZE)
+#define ENV_SIZE (CONFIG_ENV_RANGE - ENV_HEADER_SIZE)
+#endif
+
+#ifndef CONFIG_ENV_SIZE_MAX
+#define CONFIG_ENV_SIZE_MAX CONFIG_ENV_SIZE
 #endif
 
 typedef struct environment_s {
@@ -158,7 +162,7 @@ typedef struct environment_s {
 #ifdef CONFIG_SYS_REDUNDAND_ENVIRONMENT
 	unsigned char	flags;		/* active/obsolete flags	*/
 #endif
-	unsigned char	data[ENV_SIZE]; /* Environment data		*/
+	unsigned char	data[CONFIG_ENV_SIZE_MAX - ENV_HEADER_SIZE]; /* Environment data		*/
 } env_t
 #ifdef CONFIG_ENV_AES
 /* Make sure the env is aligned to block size. */
@@ -178,15 +182,6 @@ extern unsigned char env_get_char_spec(int);
 
 #if defined(CONFIG_NEEDS_MANUAL_RELOC)
 extern void env_reloc(void);
-#endif
-
-#ifdef CONFIG_ENV_IS_IN_MMC
-#include <mmc.h>
-
-extern int mmc_get_env_addr(struct mmc *mmc, int copy, u32 *env_addr);
-# ifdef CONFIG_SYS_MMC_ENV_PART
-extern uint mmc_get_env_part(struct mmc *mmc);
-# endif
 #endif
 
 #ifndef DO_DEPS_ONLY

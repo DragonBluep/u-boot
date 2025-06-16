@@ -123,7 +123,7 @@ static const char *const mtdparts_default = NULL;
 
 /* copies of last seen 'mtdids', 'mtdparts' and 'partition' env variables */
 #define MTDIDS_MAXLEN		128
-#define MTDPARTS_MAXLEN		512
+#define MTDPARTS_MAXLEN		4096
 #define PARTITION_MAXLEN	16
 static char last_ids[MTDIDS_MAXLEN];
 static char last_parts[MTDPARTS_MAXLEN];
@@ -808,6 +808,27 @@ static void device_add(struct mtd_device *dev)
 	else
 		index_partitions();
 }
+
+#ifdef CONFIG_IPQ_TINY
+int parse_nor_partition(const char *const partdef,
+			const char **ret, struct part_info **retpart)
+{
+	return  part_parse(partdef, ret, retpart);
+}
+
+void free_parse(struct list_head *head)
+{
+	struct list_head *entry, *n;
+	struct part_info *dev_tmp;
+
+	/* clean devices list */
+	list_for_each_safe(entry, n, head) {
+		dev_tmp = list_entry(entry, struct part_info, link);
+		list_del(entry);
+		free(dev_tmp);
+	}
+}
+#endif
 
 /**
  * Parse device type, name and mtd-id. If syntax is ok allocate memory and
@@ -1622,10 +1643,6 @@ static int parse_mtdids(const char *const ids)
 		}
 		p++;
 
-		/* check if requested device exists */
-		if (mtd_device_validate(type, num, &size) != 0)
-			return 1;
-
 		/* locate <mtd-id> */
 		mtd_id = p;
 		if ((p = strchr(mtd_id, ',')) != NULL) {
@@ -1637,6 +1654,13 @@ static int parse_mtdids(const char *const ids)
 		if (mtd_id_len == 0) {
 			printf("mtdids: no <mtd-id> identifier\n");
 			break;
+		}
+
+		/* check if requested device exists */
+		if (mtd_device_validate(type, num, &size) != 0) {
+			/* Skip adding invalid mtd to list entry */
+			ret = 0;
+			continue;
 		}
 
 		/* check if this id is already on the list */

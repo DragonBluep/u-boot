@@ -16,17 +16,34 @@
 #include <spi.h>
 #include <spi_flash.h>
 #include <linux/log2.h>
+#include <linux/sizes.h>
 
 #include "sf_internal.h"
 
+#if defined CONFIG_SPI_FLASH_SPANSION
+#define CMD_S25FSXX_BE	0x60
+#endif
+
+#if defined CONFIG_SPI_FLASH_CYPRESS
+#define CYPRESS_JEDEC_ID	0x012018
+#define CYPRESS_EXT_JEDEC_ID	0x4d01
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
-static void spi_flash_addr(u32 addr, u8 *cmd)
+static void spi_flash_addr(struct spi_flash *flash, u32 addr, u8 *cmd)
 {
 	/* cmd[0] is actual command */
-	cmd[1] = addr >> 16;
-	cmd[2] = addr >> 8;
-	cmd[3] = addr >> 0;
+	cmd[1] = addr >> (flash->addr_width * 8 -  8);
+	cmd[2] = addr >> (flash->addr_width * 8 -  16);
+	cmd[3] = addr >> (flash->addr_width * 8 -  24);
+	if (flash->addr_width == SPI_FLASH_4B_ADDR_LEN)
+		cmd[4] = addr >> (flash->addr_width * 8 -  32);
+}
+
+static int spi_flash_cmdsz(struct spi_flash *flash)
+{
+	return 1 + flash->addr_width;
 }
 
 /* Read commands array */
@@ -122,6 +139,7 @@ static int write_cr(struct spi_flash *flash, u8 wc)
 #endif
 
 #ifdef CONFIG_SPI_FLASH_BAR
+
 static int spi_flash_write_bar(struct spi_flash *flash, u32 offset)
 {
 	u8 cmd, bank_sel;
@@ -258,6 +276,37 @@ static int spi_flash_cmd_wait_ready(struct spi_flash *flash,
 	return -ETIMEDOUT;
 }
 
+#if defined CONFIG_SPI_FLASH_SPANSION
+int spi_flash_cmd_berase(struct spi_flash *flash, u8 erase_cmd)
+{
+	int ret;
+
+	ret = spi_claim_bus(flash->spi);
+	if (ret) {
+		debug("SF: Unable to claim SPI bus\n");
+		return ret;
+	}
+
+	ret = spi_flash_cmd_write_enable(flash);
+	if (ret)
+		goto out;
+
+	ret = spi_flash_cmd_write(flash->spi, &erase_cmd, 1, NULL, 0);
+	if (ret)
+		goto out;
+
+	ret = spi_flash_cmd_wait_ready(flash, SPI_FLASH_BERASE_TIMEOUT(flash));
+out:
+	spi_release_bus(flash->spi);
+	return ret;
+}
+
+static int bulk_erase(struct spi_flash *flash)
+{
+	return spi_flash_cmd_berase(flash, CMD_S25FSXX_BE);
+}
+#endif
+
 int spi_flash_write_common(struct spi_flash *flash, const u8 *cmd,
 		size_t cmd_len, const void *buf, size_t buf_len)
 {
@@ -302,7 +351,7 @@ int spi_flash_write_common(struct spi_flash *flash, const u8 *cmd,
 int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 {
 	u32 erase_size, erase_addr;
-	u8 cmd[SPI_FLASH_CMD_LEN];
+	u8 *cmd, cmdsz;
 	int ret = -1;
 
 	erase_size = flash->erase_size;
@@ -319,10 +368,39 @@ int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 		}
 	}
 
+	cmdsz = spi_flash_cmdsz(flash);
+	cmd = calloc(1, cmdsz);
+	if (!cmd) {
+		debug("SF: Failed to allocate cmd\n");
+		return -ENOMEM;
+	}
+
 	cmd[0] = flash->erase_cmd;
+
+	if (!(offset % SZ_64K || len % SZ_64K) && (flash->flags & SECT_64K)) {
+		erase_size = SZ_64K;
+		cmd[0] = CMD_ERASE_64K;
+	}
+
 	while (len) {
 		erase_addr = offset;
 
+#ifdef CONFIG_SPI_FLASH_CYPRESS
+		if ((flash->jedec == CYPRESS_JEDEC_ID) &&
+			(flash->ext_jedec ==  CYPRESS_EXT_JEDEC_ID)){
+			if (offset <= (SZ_32K - SZ_4K)){
+				cmd[0] = CMD_ERASE_4K;
+				erase_size = SZ_4K;
+			}else {
+				cmd[0] = CMD_ERASE_64K;
+				if (offset < SZ_64K){
+					erase_size = SZ_32K;
+				}else {
+					erase_size = SZ_64K;
+				}
+			}
+		}
+#endif
 #ifdef CONFIG_SF_DUAL_FLASH
 		if (flash->dual_flash > SF_SINGLE_FLASH)
 			spi_flash_dual(flash, &erase_addr);
@@ -332,12 +410,12 @@ int spi_flash_cmd_erase_ops(struct spi_flash *flash, u32 offset, size_t len)
 		if (ret < 0)
 			return ret;
 #endif
-		spi_flash_addr(erase_addr, cmd);
+		spi_flash_addr(flash, erase_addr, cmd);
 
 		debug("SF: erase %2x %2x %2x %2x (%x)\n", cmd[0], cmd[1],
 		      cmd[2], cmd[3], erase_addr);
 
-		ret = spi_flash_write_common(flash, cmd, sizeof(cmd), NULL, 0);
+		ret = spi_flash_write_common(flash, cmd, cmdsz, NULL, 0);
 		if (ret < 0) {
 			debug("SF: erase failed\n");
 			break;
@@ -356,7 +434,7 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 	unsigned long byte_addr, page_size;
 	u32 write_addr;
 	size_t chunk_len, actual;
-	u8 cmd[SPI_FLASH_CMD_LEN];
+	u8 *cmd, cmdsz;
 	int ret = -1;
 
 	page_size = flash->page_size;
@@ -367,6 +445,13 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 			       offset);
 			return -EINVAL;
 		}
+	}
+
+	cmdsz = spi_flash_cmdsz(flash);
+	cmd = calloc(1, cmdsz);
+	if (!cmd) {
+		debug("SF: Failed to allocate cmd\n");
+		return -ENOMEM;
 	}
 
 	cmd[0] = flash->write_cmd;
@@ -389,12 +474,12 @@ int spi_flash_cmd_write_ops(struct spi_flash *flash, u32 offset,
 			chunk_len = min(chunk_len,
 					(size_t)flash->spi->max_write_size);
 
-		spi_flash_addr(write_addr, cmd);
+		spi_flash_addr(flash, write_addr, cmd);
 
 		debug("SF: 0x%p => cmd = { 0x%02x 0x%02x%02x%02x } chunk_len = %zu\n",
 		      buf + actual, cmd[0], cmd[1], cmd[2], cmd[3], chunk_len);
 
-		ret = spi_flash_write_common(flash, cmd, sizeof(cmd),
+		ret = spi_flash_write_common(flash, cmd, cmdsz,
 					buf + actual, chunk_len);
 		if (ret < 0) {
 			debug("SF: write failed\n");
@@ -457,7 +542,7 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 		return 0;
 	}
 
-	cmdsz = SPI_FLASH_CMD_LEN + flash->dummy_byte;
+	cmdsz = spi_flash_cmdsz(flash) + flash->dummy_byte;
 	cmd = calloc(1, cmdsz);
 	if (!cmd) {
 		debug("SF: Failed to allocate cmd\n");
@@ -485,7 +570,7 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 		else
 			read_len = remain_len;
 
-		spi_flash_addr(read_addr, cmd);
+		spi_flash_addr(flash, read_addr, cmd);
 
 		ret = spi_flash_read_common(flash, cmd, cmdsz, data, read_len);
 		if (ret < 0) {
@@ -501,6 +586,76 @@ int spi_flash_cmd_read_ops(struct spi_flash *flash, u32 offset,
 	free(cmd);
 	return ret;
 }
+
+#ifdef CONFIG_SPI_NOR_GENERIC
+/* When there is no match in the flash lookup table, for the flash
+*  that is mounted, we do a generic initialization of the flash structure,
+*  so that we can access the flash.
+*/
+static int spi_nor_generic_init(struct spi_slave *spi, struct spi_flash *flash,
+			u8 *idcode)
+{
+	unsigned short jedec;
+	qca_smem_flash_info_t sfi;
+
+	jedec = idcode[1] << 8 | idcode[2];
+
+	if ((jedec == 0) || (jedec == 0xffff))
+		return 1;
+
+	printf("No match found in the SPI NOR lookup table\n");
+	/* Flash powers up read-only, so clear BP# bits */
+	if (idcode[0] == SPI_FLASH_CFI_MFR_ATMEL ||
+	    idcode[0] == SPI_FLASH_CFI_MFR_MACRONIX ||
+	    idcode[0] == SPI_FLASH_CFI_MFR_SST)
+		write_sr(flash, 0);
+
+	/* Get flash parameters from smem */
+	smem_get_boot_flash(&sfi.flash_type,
+			&sfi.flash_index,
+			&sfi.flash_chip_select,
+			&sfi.flash_block_size,
+			&sfi.flash_density);
+
+	/* Using the default functions and values for initialization
+	   which will work for most of the cases */
+	flash->write = spi_flash_cmd_write_ops;
+	flash->erase = spi_flash_cmd_erase_ops;
+	flash->read = spi_flash_cmd_read_ops;
+	flash->page_size = 256;
+	flash->sector_size = sfi.flash_block_size;
+	flash->size = sfi.flash_density;
+	flash->memory_map = spi->memory_map;
+	flash->dual_flash = flash->spi->option;
+	flash->shift = (flash->dual_flash & SF_DUAL_PARALLEL_FLASH) ? 1 : 0;
+
+	if (flash->sector_size == SZ_4K)
+		flash->erase_cmd = CMD_ERASE_4K;
+	else if (flash->sector_size == SZ_32K)
+		flash->erase_cmd = CMD_ERASE_32K;
+	else
+		flash->erase_cmd = CMD_ERASE_64K;
+
+	flash->erase_size = flash->sector_size;
+	flash->read_cmd = CMD_READ_ARRAY_FAST;
+	flash->write_cmd = CMD_PAGE_PROGRAM;
+
+	if (idcode[0] == SPI_FLASH_CFI_MFR_WINBOND)
+		flash->name = "Winbond";
+	else if (idcode[0] == SPI_FLASH_CFI_MFR_GIGA)
+		flash->name = "Giga";
+	else if (idcode[0] == SPI_FLASH_CFI_MFR_SPANSION)
+		flash->name = "Spansion";
+	else if (idcode[0] == SPI_FLASH_CFI_MFR_STMICRO)
+		flash->name = "ST micro";
+	else if (idcode[0] == SPI_FLASH_CFI_MFR_MACRONIX)
+		flash->name = "Macronix";
+	else
+		flash->name = "default";
+
+	return 0;
+}
+#endif
 
 #ifdef CONFIG_SPI_FLASH_SST
 static int sst_byte_write(struct spi_flash *flash, u32 offset, const void *buf)
@@ -905,9 +1060,20 @@ int spi_flash_scan(struct spi_flash *flash)
 	u8 idcode[5];
 	u8 cmd;
 	int ret;
+#ifdef CONFIG_SPI_NAND_MULTI_BYTE_READ_ID
+	u8 command[2];
+	int dummy_byte = 0;
 
+	command[0] = CMD_READ_ID;
+	command[1] = 0;			/*dummy byte*/
+
+try_with_dummy_byte:
 	/* Read the ID codes */
+	ret = spi_flash_cmd_read(spi, command, dummy_byte+1, idcode,
+						sizeof(idcode));
+#else
 	ret = spi_flash_cmd(spi, CMD_READ_ID, idcode, sizeof(idcode));
+#endif
 	if (ret) {
 		printf("SF: Failed to get idcodes\n");
 		return -EINVAL;
@@ -935,10 +1101,36 @@ int spi_flash_scan(struct spi_flash *flash)
 	}
 
 	if (!params->name) {
+#ifdef CONFIG_SPI_NAND
+		ret = spi_nand_flash_probe(spi, flash, idcode);
+
+		if (!ret) {
+			flash->addr_width = flash->size > 0x1000000 ? 4 : 3;
+			goto print_sf_info;
+		}
+#endif
+#ifdef CONFIG_SPI_NOR_GENERIC
+		/* We did not find a match, do generic probe */
+		ret = spi_nor_generic_init(spi, flash, idcode);
+		if (!ret)
+			goto do_generic_probe;
+#endif
+#ifdef CONFIG_SPI_NAND_MULTI_BYTE_READ_ID
+	if (dummy_byte == 0) {
+		dummy_byte = 1;
+		goto try_with_dummy_byte;
+		} else {
+			printf("SF: Unsupported flash IDs: ");
+			printf("manuf %02x, jedec %04x, ext_jedec %04x\n",
+				idcode[0], jedec, ext_jedec);
+			return -EPROTONOSUPPORT;
+		}
+#else
 		printf("SF: Unsupported flash IDs: ");
 		printf("manuf %02x, jedec %04x, ext_jedec %04x\n",
 		       idcode[0], jedec, ext_jedec);
 		return -EPROTONOSUPPORT;
+#endif
 	}
 
 	/* Flash powers up read-only, so clear BP# bits */
@@ -949,6 +1141,8 @@ int spi_flash_scan(struct spi_flash *flash)
 
 	/* Assign spi data */
 	flash->name = params->name;
+	flash->jedec = params->jedec;
+	flash->ext_jedec = params->ext_jedec;
 	flash->memory_map = spi->memory_map;
 	flash->dual_flash = flash->spi->option;
 
@@ -1013,6 +1207,8 @@ int spi_flash_scan(struct spi_flash *flash)
 	if (params->flags & SECT_4K) {
 		flash->erase_cmd = CMD_ERASE_4K;
 		flash->erase_size = 4096 << flash->shift;
+		if (flash->sector_size == SZ_64K)
+			flash->flags |= SECT_64K;
 	} else if (params->flags & SECT_32K) {
 		flash->erase_cmd = CMD_ERASE_32K;
 		flash->erase_size = 32768 << flash->shift;
@@ -1052,6 +1248,25 @@ int spi_flash_scan(struct spi_flash *flash)
 		}
 	}
 
+#ifdef CONFIG_SPI_FLASH_STMICRO
+	if (params->flags & E_FSR)
+		flash->flags |= SNOR_F_USE_FSR;
+#endif
+
+#if defined CONFIG_SPI_FLASH_SPANSION
+	if (params->bulkerase_timeout) {
+		flash->berase = bulk_erase;
+		flash->berase_timeout = params->bulkerase_timeout;
+	}
+#endif
+
+/* NOTE: Any reference to params variable below this label will break
+*  the generic initialization functionality. All the manufacturer
+*  specific initialization should  be done before this point.
+*/
+#ifdef CONFIG_SPI_NOR_GENERIC
+do_generic_probe:
+#endif
 	/* Read dummy_byte: dummy byte is determined based on the
 	 * dummy cycles of a particular command.
 	 * Fast commands - dummy_byte = dummy_cycles/8
@@ -1071,10 +1286,29 @@ int spi_flash_scan(struct spi_flash *flash)
 		flash->dummy_byte = 1;
 	}
 
-#ifdef CONFIG_SPI_FLASH_STMICRO
-	if (params->flags & E_FSR)
-		flash->flags |= SNOR_F_USE_FSR;
+	flash->addr_width = SPI_FLASH_3B_ADDR_LEN;
+	if (flash->size > SPI_FLASH_16MB_BOUN) {
+		if (get_smem_spi_addr_len() == SPI_FLASH_4B_ADDR_LEN) {
+			flash->addr_width = SPI_FLASH_4B_ADDR_LEN;
+		} else {
+#ifdef CONFIG_IPQ_4B_ADDR_SWITCH_REQD
+			if (idcode[0] == SPI_FLASH_CFI_MFR_GIGA ||
+			    idcode[0] == SPI_FLASH_CFI_MFR_WINBOND) {
+				ret = spi_flash_cmd(spi,
+						    SPI_FLASH_CMD_EN4B,
+						    NULL, 0);
+				if (ret) {
+					printf("SF:Failed to switch to 4 byte mode\n");
+					flash->size = 0x1000000;
+				} else
+					flash->addr_width =
+						SPI_FLASH_4B_ADDR_LEN;
+			}
 #endif
+		}
+	}
+	printf("SPI_ADDR_LEN=%x\n",flash->addr_width);
+
 
 	/* Configure the BAR - discover bank cmds and read current bank */
 #ifdef CONFIG_SPI_FLASH_BAR
@@ -1091,6 +1325,9 @@ int spi_flash_scan(struct spi_flash *flash)
 	}
 #endif
 
+#ifdef CONFIG_SPI_NAND
+print_sf_info:
+#endif
 #ifndef CONFIG_SPL_BUILD
 	printf("SF: Detected %s with page size ", flash->name);
 	print_size(flash->page_size, ", erase size ");
@@ -1110,6 +1347,5 @@ int spi_flash_scan(struct spi_flash *flash)
 		puts(" Full access #define CONFIG_SPI_FLASH_BAR\n");
 	}
 #endif
-
 	return ret;
 }

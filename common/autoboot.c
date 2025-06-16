@@ -14,8 +14,11 @@
 #include <menu.h>
 #include <post.h>
 #include <u-boot/sha256.h>
+#include <asm/arch-qca-common/qca_common.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+
+extern int do_dumpqca_minimal_data(const char *offset);
 
 #define MAX_DELAY_STOP_STR 32
 
@@ -271,7 +274,6 @@ static int abortboot_normal(int bootdelay)
 	if (abort)
 		gd->flags &= ~GD_FLG_SILENT;
 #endif
-
 	return abort;
 }
 # endif	/* CONFIG_AUTOBOOT_KEYED */
@@ -354,9 +356,54 @@ const char *bootdelay_process(void)
 	return s;
 }
 
+__weak int apps_iscrashed(void)
+{
+	return 0;
+}
+
+__weak int apps_iscrashed_crashdump_disabled(void)
+{
+	return 0;
+}
+
+__weak void indicate_sdx_device(void) {}
+
 void autoboot_command(const char *s)
 {
 	debug("### main_loop: bootcmd=\"%s\"\n", s ? s : "<UNDEFINED>");
+
+#ifdef CONFIG_QCA_APPSBL_DLOAD
+	/*
+	 * If kernel has crashed in previous boot,
+	 * jump to crash dump collection.
+	 */
+	if (apps_iscrashed()) {
+		printf("Crashdump magic found, initializing dump activity..\n");
+		indicate_sdx_device();
+		s = getenv("dump_to_flash");
+		if (!s) {
+			s = getenv("dump_minimal");
+			if (s) {
+				if (strncmp(s, "1", sizeof("1"))) {
+					printf("\nError: Invalid variable dump_minimal \n");
+					reset_board();
+				}
+			}
+		}
+		if (s) {
+			do_dumpqca_minimal_data(s);
+			reset_board();
+		}
+		else
+			dump_func(FULL_DUMP);
+		return;
+	}
+#endif
+
+	if (apps_iscrashed_crashdump_disabled()) {
+		printf("Crashdump disabled, resetting the board..\n");
+		reset_board();
+	}
 
 	if (stored_bootdelay != -1 && s && !abortboot(stored_bootdelay)) {
 #if defined(CONFIG_AUTOBOOT_KEYED) && !defined(CONFIG_AUTOBOOT_KEYED_CTRLC)
@@ -377,4 +424,9 @@ void autoboot_command(const char *s)
 			run_command_list(s, -1, 0);
 	}
 #endif /* CONFIG_MENUKEY */
+
+#ifdef CONFIG_IPQ_ETH_INIT_DEFER
+	puts("\nNet:   ");
+	eth_initialize();
+#endif
 }

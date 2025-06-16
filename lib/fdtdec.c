@@ -11,6 +11,7 @@
 #include <fdtdec.h>
 #include <asm/sections.h>
 #include <linux/ctype.h>
+#include <asm/arch-qca-common/smem.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -74,6 +75,9 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(ALTERA_SOCFPGA_DWC2USB, "snps,dwc2"),
 	COMPAT(COMPAT_INTEL_BAYTRAIL_FSP, "intel,baytrail-fsp"),
 	COMPAT(COMPAT_INTEL_BAYTRAIL_FSP_MDP, "intel,baytrail-fsp-mdp"),
+	COMPAT(COMPAT_QCA_QPIC_NAND_V1_5_20, "qcom,qpic-nand.1.5.20"),
+	COMPAT(COMPAT_QCA_QPIC_NAND_V1_4_20, "qcom,qpic-nand.1.4.20"),
+	COMPAT(QCA_QUP_I2C, "qcom,qup-ip2c"),
 };
 
 const char *fdtdec_get_compatible(enum fdt_compat_id id)
@@ -1211,8 +1215,102 @@ int fdtdec_decode_display_timing(const void *blob, int parent, int index,
 	return 0;
 }
 
+#ifdef CONFIG_OF_COMBINE
+
+#ifdef CONFIG_COMPRESSED_DTB_BASE
+extern unsigned long __dtb_blob_begin;
+extern unsigned long __dtb_blob_end;
+
+
+static uint32_t uncompress_gzipped_dtb(unsigned long dest_ddr_addr)
+{
+	uint32_t  size;
+	unsigned long compressed_len;
+	unsigned long dtb_begin;
+	unsigned long dtb_end;
+
+	dtb_begin = (unsigned long)&__dtb_blob_begin;
+	dtb_end = (unsigned long)&__dtb_blob_end;
+
+	size = CONFIG_COMPRESSED_DTB_MAX_SIZE;
+	compressed_len = dtb_end - dtb_begin;
+	if (gunzip((void *)dest_ddr_addr, size, (unsigned char *)dtb_begin, &compressed_len) != 0 )
+		hang();
+	else
+		debug("Unzipping compressed DTB's success\n");
+	return compressed_len;
+
+}
+
+# else
+extern unsigned long __dtb_table_start;
+
+#endif
+
+struct dtb_combined_hdr {
+	unsigned long machid;
+	unsigned long dtbaddr;
+};
+
+
+static int parse_combined_fdt(unsigned long machid)
+{
+	unsigned long *ptr = NULL;
+	struct dtb_combined_hdr *fdt_table;
+	unsigned long ndtbs = 0;
+#ifdef CONFIG_COMPRESSED_DTB_BASE
+	uint32_t size, uncompressed_size;
+	unsigned long dtb_end, dtb_begin, dtb_base;
+	unsigned long pgtable_base;
+
+	uncompressed_size = uncompress_gzipped_dtb(CONFIG_COMPRESSED_DTB_BASE);
+	ptr = (void *)CONFIG_COMPRESSED_DTB_BASE;
+# else
+	ptr = &__dtb_table_start;
+#endif
+	ndtbs = *ptr;
+
+	ptr++;
+
+	fdt_table = (struct dtb_combined_hdr *)ptr;
+
+	while(ndtbs && (fdt_table->machid != machid)) {
+		fdt_table++;
+		ndtbs--;
+	}
+
+	if(ndtbs == 0)
+		hang();
+
+#ifdef CONFIG_COMPRESSED_DTB_BASE
+	dtb_begin = fdt_table->dtbaddr;
+
+	if (ndtbs == 1) {
+		size = CONFIG_COMPRESSED_DTB_BASE + uncompressed_size - dtb_begin;
+	} else {
+		fdt_table++;
+		dtb_end = fdt_table->dtbaddr;
+		size = dtb_end - dtb_begin;
+	}
+
+	pgtable_base = CONFIG_SYS_TEXT_BASE + gd->mon_len;
+	pgtable_base += (0x10000 - 1);
+	pgtable_base &= ~(0x10000 - 1);
+	dtb_base = (unsigned long)(pgtable_base + PGTABLE_SIZE) + 0x4; // 0x4 breathing space for overcome overlap.
+
+	memcpy((ulong *)dtb_base, (void *)dtb_begin, size);
+
+	return dtb_base;
+# else
+	return fdt_table->dtbaddr;
+#endif
+
+}
+#endif
+
 int fdtdec_setup(void)
 {
+	unsigned int machid;
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 # ifdef CONFIG_OF_EMBED
 	/* Get a pointer to the FDT */
@@ -1225,8 +1323,14 @@ int fdtdec_setup(void)
 	else
 		gd->fdt_blob = (ulong *)&__bss_end;
 #  else
+#ifdef CONFIG_OF_COMBINE
+	machid = smem_get_board_platform_type();
+	gd->fdt_blob = (ulong *)
+			parse_combined_fdt(get_dts_machid(machid));
+#else
 	/* FDT is at end of image */
 	gd->fdt_blob = (ulong *)&_end;
+#endif
 #  endif
 # elif defined(CONFIG_OF_HOSTFILE)
 	if (sandbox_read_fdt_from_file()) {

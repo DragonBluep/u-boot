@@ -5,6 +5,8 @@
  * (C) Copyright 2001
  * Gerald Van Baren, Custom IDEAS, vanbaren@cideas.com.
  *
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
@@ -19,6 +21,17 @@
 #include <miiphy.h>
 
 #define BB_MII_RELOCATE(v,off) (v += (v?off:0))
+
+#define MDIO_READ 2
+#define MDIO_WRITE 1
+
+#define MDIO_C45 (1<<15)
+#define MDIO_C45_ADDR (MDIO_C45 | 0)
+#define MDIO_C45_READ (MDIO_C45 | 3)
+#define MDIO_C45_WRITE (MDIO_C45 | 1)
+
+#define MDIO_SETUP_TIME 10
+#define MDIO_HOLD_TIME 10
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -150,8 +163,8 @@ static inline struct bb_miiphy_bus *bb_miiphy_getbus(const char *devname)
  * Utility to send the preamble, address, and register (common to read
  * and write).
  */
-static void miiphy_pre(struct bb_miiphy_bus *bus, char read,
-		       unsigned char addr, unsigned char reg)
+static void miiphy_pre(struct bb_miiphy_bus *bus, int read,
+		       unsigned int addr, unsigned int reg)
 {
 	int j;
 
@@ -172,24 +185,35 @@ static void miiphy_pre(struct bb_miiphy_bus *bus, char read,
 		bus->delay(bus);
 	}
 
-	/* send the start bit (01) and the read opcode (10) or write (10) */
+	/* send the start bit (01) and the read opcode (10) or write (10)
+	 * Clause 45 operation uses 00 for the start and 11, 10 for read/write
+	 */
 	bus->set_mdc(bus, 0);
 	bus->set_mdio(bus, 0);
 	bus->delay(bus);
 	bus->set_mdc(bus, 1);
 	bus->delay(bus);
 	bus->set_mdc(bus, 0);
-	bus->set_mdio(bus, 1);
+	if (read & MDIO_C45)
+		bus->set_mdio(bus, 0);
+	else
+		bus->set_mdio(bus, 1);
 	bus->delay(bus);
 	bus->set_mdc(bus, 1);
 	bus->delay(bus);
 	bus->set_mdc(bus, 0);
-	bus->set_mdio(bus, read);
+	if (read & MDIO_C45)
+		bus->set_mdio(bus, ((read >> 1) & 1));
+	else
+		bus->set_mdio(bus, read);
 	bus->delay(bus);
 	bus->set_mdc(bus, 1);
 	bus->delay(bus);
 	bus->set_mdc(bus, 0);
-	bus->set_mdio(bus, !read);
+	if (read & MDIO_C45)
+		bus->set_mdio(bus, ((read >> 0) & 1));
+	else
+		bus->set_mdio(bus, !read);
 	bus->delay(bus);
 	bus->set_mdc(bus, 1);
 	bus->delay(bus);
@@ -221,6 +245,135 @@ static void miiphy_pre(struct bb_miiphy_bus *bus, char read,
 		bus->delay(bus);
 		reg <<= 1;
 	}
+}
+
+static int bb_miiphy_cmd_addr(struct bb_miiphy_bus *bus, unsigned phy_addr,
+				unsigned int reg_addr)
+{
+	unsigned int dev_reg = (reg_addr >> 16) & 0x1F;
+	unsigned int reg = reg_addr & 0xFFFF;
+	int v, i;
+
+	miiphy_pre (bus, MDIO_C45_ADDR, phy_addr, dev_reg);
+
+	/* send the turnaround (10) */
+	bus->set_mdc(bus, 0);
+	bus->set_mdio(bus, 1);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+	bus->set_mdc(bus, 0);
+	bus->set_mdio(bus, 0);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+
+	for (i = 15; i >= 0; i--) {
+		bus->set_mdc(bus, 0);
+		bus->set_mdio(bus, ((reg >> i) & 1));
+		bus->delay(bus);
+		bus->set_mdc(bus, 1);
+		bus->delay(bus);
+	}
+
+	/* tri-state our MDIO I/O pin so we can read */
+	bus->set_mdc(bus, 0);
+	bus->mdio_tristate(bus);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+	bus->get_mdio(bus, &v);
+	bus->set_mdc(bus, 0);
+
+	return dev_reg;
+}
+
+/*****************************************************************************
+ *
+ * Read a MII PHY register V2.
+ * This API support C45 support
+ * Returns:
+ *   0 on success
+ */
+
+
+int bb_miiphy_read_v2(const char *devname, unsigned phy_addr,
+		  unsigned int reg, unsigned short *value)
+{
+	short rdreg; /* register working value */
+	int v;
+	int j; /* counter */
+	struct bb_miiphy_bus *bus;
+	int phy_reg;
+
+	bus = bb_miiphy_getbus(devname);
+	if (bus == NULL) {
+		return -1;
+	}
+
+	if (value == NULL) {
+		puts("NULL value pointer\n");
+		return -1;
+	}
+
+	if (reg & MII_ADDR_C45) {
+		phy_reg = bb_miiphy_cmd_addr(bus, phy_addr, reg);
+		miiphy_pre(bus, MDIO_C45_READ, phy_addr, phy_reg);
+	} else {
+		miiphy_pre(bus, 1, phy_addr, reg);
+	}
+
+	/* tri-state our MDIO I/O pin so we can read */
+	bus->set_mdc(bus, 0);
+	bus->mdio_tristate(bus);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+
+	/* check the turnaround bit: the PHY should be driving it to zero */
+	bus->get_mdio(bus, &v);
+	if (v != 0) {
+		/* puts ("PHY didn't drive TA low\n"); */
+		for (j = 0; j < 32; j++) {
+			bus->set_mdc(bus, 0);
+			bus->delay(bus);
+			bus->set_mdc(bus, 1);
+			bus->delay(bus);
+		}
+		/* There is no PHY, set value to 0xFFFF and return */
+		*value = 0xFFFF;
+		return -1;
+	}
+
+	bus->set_mdc(bus, 0);
+	bus->delay(bus);
+
+	/* read 16 bits of register data, MSB first */
+	rdreg = 0;
+	for (j = 0; j < 16; j++) {
+		bus->set_mdc(bus, 1);
+		bus->delay(bus);
+		rdreg <<= 1;
+		bus->get_mdio(bus, &v);
+		rdreg |= (v & 0x1);
+		bus->set_mdc(bus, 0);
+		bus->delay(bus);
+	}
+
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+	bus->set_mdc(bus, 0);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+
+	*value = rdreg;
+
+#ifdef DEBUG
+	printf ("miiphy_read_v2(0x%x) @ 0x%x = 0x%04x\n", reg, addr, *value);
+#endif
+
+	return 0;
 }
 
 /*****************************************************************************
@@ -304,6 +457,71 @@ int bb_miiphy_read(const char *devname, unsigned char addr,
 }
 
 
+/*****************************************************************************
+ *
+ * Write a MII PHY register V2.
+ * This API support C45 support
+ * Returns:
+ *   0 on success
+ */
+int bb_miiphy_write_v2(const char *devname, unsigned int phy_addr,
+		     unsigned int reg, unsigned short value)
+{
+	struct bb_miiphy_bus *bus;
+	int j;			/* counter */
+	unsigned int phy_reg;
+
+	bus = bb_miiphy_getbus(devname);
+	if (bus == NULL) {
+		/* Bus not found! */
+		return -1;
+	}
+
+	if (reg & MII_ADDR_C45) {
+		phy_reg = bb_miiphy_cmd_addr(bus, phy_addr, reg);
+		miiphy_pre(bus, MDIO_C45_WRITE, phy_addr, phy_reg);
+	} else {
+		miiphy_pre(bus, 0, phy_addr, reg);
+	}
+
+	/* send the turnaround (10) */
+	bus->set_mdc(bus, 0);
+	bus->set_mdio(bus, 1);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+	bus->set_mdc(bus, 0);
+	bus->set_mdio(bus, 0);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+
+	/* write 16 bits of register data, MSB first */
+	for (j = 0; j < 16; j++) {
+		bus->set_mdc(bus, 0);
+		if ((value & 0x00008000) == 0) {
+			bus->set_mdio(bus, 0);
+		} else {
+			bus->set_mdio(bus, 1);
+		}
+		bus->delay(bus);
+		bus->set_mdc(bus, 1);
+		bus->delay(bus);
+		value <<= 1;
+	}
+
+	/*
+	 * Tri-state the MDIO line.
+	 */
+	bus->mdio_tristate(bus);
+	bus->set_mdc(bus, 0);
+	bus->delay(bus);
+	bus->set_mdc(bus, 1);
+	bus->delay(bus);
+
+	return 0;
+
+}
 /*****************************************************************************
  *
  * Write a MII PHY register.

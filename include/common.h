@@ -24,9 +24,33 @@ typedef volatile unsigned char	vu_char;
 #include <asm/ptrace.h>
 #include <stdarg.h>
 #include <linux/kernel.h>
+
 #if defined(CONFIG_PCI) && defined(CONFIG_4xx)
 #include <pci.h>
 #endif
+
+#if defined(CONFIG_IPQ40XX)
+#include <../board/qca/arm/ipq40xx/ipq40xx.h>
+
+#elif defined(CONFIG_IPQ806X)
+#include <../board/qca/arm/ipq806x/ipq806x.h>
+
+#elif defined(CONFIG_IPQ5018)
+#include <../board/qca/arm/ipq5018/ipq5018.h>
+
+#elif defined(CONFIG_IPQ5332)
+#include <../board/qca/arm/ipq5332/ipq5332.h>
+
+#elif defined(CONFIG_IPQ6018)
+#include <../board/qca/arm/ipq6018/ipq6018.h>
+
+#elif defined(CONFIG_IPQ9574)
+#include <../board/qca/arm/ipq9574/ipq9574.h>
+
+#elif defined(CONFIG_IPQ_RUMI)
+#include <../board/qca/arm/ipq807x/ipq807x.h>
+#endif
+
 #if defined(CONFIG_8xx)
 #include <asm/8xx_immap.h>
 #if defined(CONFIG_MPC859)	|| defined(CONFIG_MPC859T)	|| \
@@ -219,6 +243,11 @@ int run_command_repeatable(const char *cmd, int flag);
  */
 int run_command_list(const char *cmd, int len, int flag);
 
+extern void mmu_setup(void);
+extern int mmu_enabled(void);
+extern void cp_delay (void);
+void secondary_core_entry(char *argv, int *cmd_complete, int *cmd_result);
+
 /* arch/$(ARCH)/lib/board.c */
 void board_init_f(ulong);
 void board_init_r(gd_t *, ulong) __attribute__ ((noreturn));
@@ -285,7 +314,9 @@ static inline int print_cpuinfo(void)
 #endif
 int update_flash_size(int flash_size);
 int arch_early_init_r(void);
+extern unsigned long __stack_chk_guard;
 
+void __stack_chk_fail(void);
 /**
  * arch_cpu_init_dm() - init CPU after driver model is available
  *
@@ -333,6 +364,8 @@ void board_show_dram(phys_size_t size);
  * @return 0 if ok, or -ve FDT_ERR_... on failure
  */
 int arch_fixup_fdt(void *blob);
+
+void parse_fdt_fixup(char* buf, void *blob);
 
 /* common/flash.c */
 void flash_perror (int);
@@ -386,7 +419,14 @@ ulong getenv_hex(const char *varname, ulong default_val);
  * Return -1 if variable does not exist (default to true)
  */
 int getenv_yesno(const char *var);
+#if defined(CONFIG_IPQ40XX_ENV) || defined(CONFIG_IPQ807X_ENV) ||	\
+	defined(CONFIG_IPQ806X_ENV) || defined(CONFIG_IPQ5018_ENV) ||	\
+	defined(CONFIG_IPQ5332_ENV) || defined(CONFIG_IPQ6018_ENV) ||	\
+	defined(CONFIG_IPQ9574_ENV)
+extern int (*saveenv)(void);
+#else
 int	saveenv	     (void);
+#endif
 int	setenv	     (const char *, const char *);
 int setenv_ulong(const char *varname, ulong value);
 int setenv_hex(const char *varname, ulong value);
@@ -498,6 +538,7 @@ extern ssize_t spi_write (uchar *, int, uchar *, int);
 
 /* $(BOARD)/$(BOARD).c */
 int board_early_init_f (void);
+int board_fix_fdt (void *rw_fdt_blob); /* manipulate the U-Boot fdt before its relocation */
 int board_late_init (void);
 int board_postclk_init (void); /* after clocks/timebase, before env/serial */
 int board_early_init_r (void);
@@ -757,6 +798,10 @@ void	flush_dcache_range(unsigned long start, unsigned long stop);
 void	invalidate_dcache_range(unsigned long start, unsigned long stop);
 void	invalidate_dcache_all(void);
 void	invalidate_icache_all(void);
+void	set_l2_indirect_reg(u32 reg_addr, u32 val);
+void	clear_l2cache_err(void);
+u32	get_l2_indirect_reg(u32 reg_addr);
+void	report_l2err(u32 l2esr);
 
 enum {
 	/* Disable caches (else flush caches but leave them active) */

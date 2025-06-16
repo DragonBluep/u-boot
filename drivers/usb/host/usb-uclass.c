@@ -174,7 +174,6 @@ int usb_stop(void)
 #ifdef CONFIG_USB_STORAGE
 	usb_stor_reset();
 #endif
-	usb_hub_reset();
 	uc_priv->companion_device_count = 0;
 	usb_started = 0;
 
@@ -227,7 +226,6 @@ int usb_init(void)
 	int ret;
 
 	asynch_allowed = 1;
-	usb_hub_reset();
 
 	ret = uclass_get(UCLASS_USB, &uc);
 	if (ret)
@@ -252,13 +250,12 @@ int usb_init(void)
 		}
 		controllers_initialized++;
 		usb_started = true;
-	}
 
-	/*
-	 * lowlevel init done, now scan the bus for devices i.e. search HUBs
-	 * and configure them, first scan primary controllers.
-	 */
-	uclass_foreach_dev(bus, uc) {
+		/*
+		 * lowlevel init done, now scan the bus for devices i.e. search HUBs
+		 * and configure them, first scan primary controllers.
+		 */
+
 		if (!device_active(bus))
 			continue;
 

@@ -39,18 +39,19 @@
 #define CONFIG_ENV_RANGE	CONFIG_ENV_SIZE
 #endif
 
-char *env_name_spec = "NAND";
+char *nand_env_name_spec = "NAND";
 
 #if defined(ENV_IS_EMBEDDED)
-env_t *env_ptr = &environment;
+env_t *nand_env_ptr = &environment;
 #elif defined(CONFIG_NAND_ENV_DST)
-env_t *env_ptr = (env_t *)CONFIG_NAND_ENV_DST;
+env_t *nand_env_ptr = (env_t *)CONFIG_NAND_ENV_DST;
 #else /* ! ENV_IS_EMBEDDED */
-env_t *env_ptr;
+env_t *nand_env_ptr;
 #endif /* ENV_IS_EMBEDDED */
 
 DECLARE_GLOBAL_DATA_PTR;
 
+int nand_env_device = 0;
 /*
  * This is called before nand_init() so we can't read NAND to
  * validate env data.
@@ -63,7 +64,7 @@ DECLARE_GLOBAL_DATA_PTR;
  * This way the SPL loads not only the U-Boot image from NAND but
  * also the environment.
  */
-int env_init(void)
+int nand_env_init(void)
 {
 #if defined(ENV_IS_EMBEDDED) || defined(CONFIG_NAND_ENV_DST)
 	int crc1_ok = 0, crc2_ok = 0;
@@ -127,27 +128,28 @@ int env_init(void)
  */
 static int writeenv(size_t offset, u_char *buf)
 {
-	size_t end = offset + CONFIG_ENV_RANGE;
+	size_t end = offset + board_env_size;
 	size_t amount_saved = 0;
 	size_t blocksize, len;
 	u_char *char_ptr;
 
-	blocksize = nand_info[0].erasesize;
-	len = min(blocksize, (size_t)CONFIG_ENV_SIZE);
+	blocksize = nand_info[nand_env_device].erasesize;
+	len = min(blocksize, (size_t)CONFIG_ENV_RANGE);
 
-	while (amount_saved < CONFIG_ENV_SIZE && offset < end) {
-		if (nand_block_isbad(&nand_info[0], offset)) {
+	while (amount_saved < CONFIG_ENV_RANGE && offset < end) {
+		if (nand_block_isbad(&nand_info[nand_env_device], offset)) {
 			offset += blocksize;
 		} else {
 			char_ptr = &buf[amount_saved];
-			if (nand_write(&nand_info[0], offset, &len, char_ptr))
+			if (nand_write(&nand_info[nand_env_device],
+				       offset, &len, char_ptr))
 				return 1;
 
 			offset += blocksize;
 			amount_saved += len;
 		}
 	}
-	if (amount_saved != CONFIG_ENV_SIZE)
+	if (amount_saved != CONFIG_ENV_RANGE)
 		return 1;
 
 	return 0;
@@ -155,7 +157,7 @@ static int writeenv(size_t offset, u_char *buf)
 
 struct env_location {
 	const char *name;
-	const nand_erase_options_t erase_opts;
+	nand_erase_options_t erase_opts;
 };
 
 static int erase_and_write_env(const struct env_location *location,
@@ -164,7 +166,7 @@ static int erase_and_write_env(const struct env_location *location,
 	int ret = 0;
 
 	printf("Erasing %s...\n", location->name);
-	if (nand_erase_opts(&nand_info[0], &location->erase_opts))
+	if (nand_erase_opts(&nand_info[nand_env_device], &location->erase_opts))
 		return 1;
 
 	printf("Writing to %s... ", location->name);
@@ -178,16 +180,15 @@ static int erase_and_write_env(const struct env_location *location,
 static unsigned char env_flags;
 #endif
 
-int saveenv(void)
+int nand_saveenv(void)
 {
 	int	ret = 0;
-	ALLOC_CACHE_ALIGN_BUFFER(env_t, env_new, 1);
 	int	env_idx = 0;
-	static const struct env_location location[] = {
+	struct env_location location[] = {
 		{
 			.name = "NAND",
 			.erase_opts = {
-				.length = CONFIG_ENV_RANGE,
+				.length = board_env_size,
 				.offset = CONFIG_ENV_OFFSET,
 			},
 		},
@@ -202,24 +203,33 @@ int saveenv(void)
 #endif
 	};
 
-
-	if (CONFIG_ENV_RANGE < CONFIG_ENV_SIZE)
+	env_t *env_new = (env_t *)memalign(ARCH_DMA_MINALIGN, CONFIG_ENV_SIZE);
+	if (!env_new) {
+		printf("Error: Cannot allocate %d bytes\n", CONFIG_ENV_SIZE);
 		return 1;
+	}
+
+	if (CONFIG_ENV_RANGE > board_env_size) {
+		free(env_new);
+		return 1;
+	}
 
 	ret = env_export(env_new);
-	if (ret)
+	if (ret) {
+		free(env_new);
 		return ret;
+	}
 
 #ifdef CONFIG_ENV_OFFSET_REDUND
 	env_new->flags = ++env_flags; /* increase the serial */
 	env_idx = (gd->env_valid == 1);
 #endif
-
 	ret = erase_and_write_env(&location[env_idx], (u_char *)env_new);
 #ifdef CONFIG_ENV_OFFSET_REDUND
 	if (!ret) {
 		/* preset other copy for next write */
 		gd->env_valid = gd->env_valid == 2 ? 1 : 2;
+		free(env_new);
 		return ret;
 	}
 
@@ -229,7 +239,7 @@ int saveenv(void)
 		printf("Warning: primary env write failed,"
 				" redundancy is lost!\n");
 #endif
-
+	free(env_new);
 	return ret;
 }
 #endif /* CMD_SAVEENV */
@@ -242,25 +252,25 @@ static int readenv(size_t offset, u_char *buf)
 #else
 static int readenv(size_t offset, u_char *buf)
 {
-	size_t end = offset + CONFIG_ENV_RANGE;
+	size_t end = offset + board_env_size;
 	size_t amount_loaded = 0;
 	size_t blocksize, len;
 	u_char *char_ptr;
 
-	blocksize = nand_info[0].erasesize;
+	blocksize = nand_info[nand_env_device].erasesize;
 	if (!blocksize)
 		return 1;
 
-	len = min(blocksize, (size_t)CONFIG_ENV_SIZE);
+	len = min(blocksize, (size_t)CONFIG_ENV_RANGE);
 
-	while (amount_loaded < CONFIG_ENV_SIZE && offset < end) {
-		if (nand_block_isbad(&nand_info[0], offset)) {
+	while (amount_loaded < CONFIG_ENV_RANGE && offset < end) {
+		if (nand_block_isbad(&nand_info[nand_env_device], offset)) {
 			offset += blocksize;
 		} else {
 			char_ptr = &buf[amount_loaded];
-			if (nand_read_skip_bad(&nand_info[0], offset,
+			if (nand_read_skip_bad(&nand_info[nand_env_device], offset,
 					       &len, NULL,
-					       nand_info[0].size, char_ptr))
+					       nand_info[nand_env_device].size, char_ptr))
 				return 1;
 
 			offset += blocksize;
@@ -268,7 +278,7 @@ static int readenv(size_t offset, u_char *buf)
 		}
 	}
 
-	if (amount_loaded != CONFIG_ENV_SIZE)
+	if (amount_loaded != CONFIG_ENV_RANGE)
 		return 1;
 
 	return 0;
@@ -308,7 +318,7 @@ int get_nand_env_oob(nand_info_t *nand, unsigned long *result)
 #endif
 
 #ifdef CONFIG_ENV_OFFSET_REDUND
-void env_relocate_spec(void)
+void nand_env_relocate_spec(void)
 {
 #if !defined(ENV_IS_EMBEDDED)
 	int read1_fail = 0, read2_fail = 0;
@@ -380,14 +390,20 @@ done:
  * device i.e., nand_dev_desc + 0. This is also the behaviour using
  * the new NAND code.
  */
-void env_relocate_spec(void)
+void nand_env_relocate_spec(void)
 {
 #if !defined(ENV_IS_EMBEDDED)
 	int ret;
-	ALLOC_CACHE_ALIGN_BUFFER(char, buf, CONFIG_ENV_SIZE);
+	char *buf = NULL;
+	buf = (char *)memalign(ARCH_DMA_MINALIGN, CONFIG_ENV_SIZE);
+	if (!buf) {
+		printf("Error: Cannot allocate %d bytes\n", CONFIG_ENV_SIZE);
+		set_default_env(NULL);
+		return;
+        }
 
 #if defined(CONFIG_ENV_OFFSET_OOB)
-	ret = get_nand_env_oob(&nand_info[0], &nand_env_oob_offset);
+	ret = get_nand_env_oob(&nand_info[nand_env_device], &nand_env_oob_offset);
 	/*
 	 * If unable to read environment offset from NAND OOB then fall through
 	 * to the normal environment reading code below
@@ -396,6 +412,7 @@ void env_relocate_spec(void)
 		printf("Found Environment offset in OOB..\n");
 	} else {
 		set_default_env("!no env offset in OOB");
+		free(buf);
 		return;
 	}
 #endif
@@ -403,10 +420,12 @@ void env_relocate_spec(void)
 	ret = readenv(CONFIG_ENV_OFFSET, (u_char *)buf);
 	if (ret) {
 		set_default_env("!readenv() failed");
+		free(buf);
 		return;
 	}
 
 	env_import(buf, 1);
+	free(buf);
 #endif /* ! ENV_IS_EMBEDDED */
 }
 #endif /* CONFIG_ENV_OFFSET_REDUND */

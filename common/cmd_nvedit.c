@@ -633,6 +633,11 @@ char *getenv(const char *name)
 		hsearch_r(e, FIND, &ep, &env_htab, 0);
 
 		return ep ? ep->data : NULL;
+	} else {
+#ifdef CONFIG_ENV_SIZE_MAX
+/* for first time set maximum */
+#define CONFIG_ENV_SIZE CONFIG_ENV_SIZE_MAX
+#endif
 	}
 
 	/* restricted capabilities before import */
@@ -746,6 +751,11 @@ static int do_env_default(cmd_tbl_t *cmdtp, int __flag,
 			  int argc, char * const argv[])
 {
 	int all = 0, flag = 0;
+
+	if (argc == 2 && strcmp(argv[1], "-f") == 0) {
+		set_default_env("## Resetting to default environment\n");
+		return 0;
+	}
 
 	debug("Initial value for argc=%d\n", argc);
 	while (--argc > 0 && **++argv == '-') {

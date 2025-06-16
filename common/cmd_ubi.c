@@ -327,6 +327,17 @@ int ubi_volume_write(char *volume, void *buf, size_t size)
 	return ubi_volume_begin_write(volume, buf, size, size);
 }
 
+long long ubi_get_volume_size(char *volume)
+{
+	struct ubi_volume *vol;
+
+	vol = ubi_find_volume(volume);
+	if (vol == NULL)
+		return -ENODEV;
+
+	return vol->used_bytes;
+}
+
 int ubi_volume_read(char *volume, char *buf, size_t size)
 {
 	int err, lnum, off, len, tbuf_size;
@@ -475,6 +486,8 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 	if (ubi_initialized) {
 		ubi_exit();
 		del_mtd_partitions(ubi_dev.mtd_info);
+		put_mtd_device(ubi_dev.mtd_info);
+		ubi_initialized = 0;
 	}
 
 	/*
@@ -513,9 +526,23 @@ static int do_ubi(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	int64_t size = 0;
 	ulong addr = 0;
+	int err = 0;
 
 	if (argc < 2)
 		return CMD_RET_USAGE;
+
+#ifdef CONFIG_QSPI_LAYOUT_SWITCH
+	if (strcmp(argv[1], "exit") == 0)  {
+		if (ubi_initialized) {
+			printf("!! Detaching UBI partition\n");
+			ubi_exit();
+			del_mtd_partitions(ubi_dev.mtd_info);
+			put_mtd_device(ubi_dev.mtd_info);
+			ubi_initialized = 0;
+		}
+		return 0;
+	}
+#endif
 
 	if (strcmp(argv[1], "part") == 0) {
 		const char *vid_header_offset = NULL;
@@ -650,7 +677,12 @@ static int do_ubi(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 			printf("Read %lld bytes from volume %s to %lx\n", size,
 			       argv[3], addr);
 
-			return ubi_volume_read(argv[3], (char *)addr, size);
+			err = ubi_volume_read(argv[3], (char *)addr, size);
+			if (err != 0) {
+				ubi_detach_mtd_dev(ubi_dev.nr, 1);
+				put_mtd_device(ubi_dev.mtd_info);
+			}
+			return err;
 		}
 	}
 

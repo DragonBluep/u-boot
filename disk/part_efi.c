@@ -70,6 +70,14 @@ static inline int is_bootable(gpt_entry *p)
 			sizeof(efi_guid_t));
 }
 
+static inline int is_readonly(gpt_entry *p)
+{
+	/* bit 60 of gpt attribute denotes read-only flag */
+	if (p->attributes.raw & ((unsigned long long)1 << 60))
+		return 1;
+	return 0;
+}
+
 static int validate_gpt_header(gpt_header *gpt_h, lbaint_t lba,
 		lbaint_t lastlba)
 {
@@ -279,10 +287,11 @@ int get_partition_info_efi(block_dev_desc_t * dev_desc, int part,
 		     - info->start;
 	info->blksz = dev_desc->blksz;
 
-	sprintf((char *)info->name, "%s",
+	snprintf((char *)info->name, sizeof(info->name), "%s",
 			print_efiname(&gpt_pte[part - 1]));
-	sprintf((char *)info->type, "U-Boot");
+	snprintf((char *)info->type, sizeof(info->type), "U-Boot");
 	info->bootable = is_bootable(&gpt_pte[part - 1]);
+	info->readonly = is_readonly(&gpt_pte[part - 1]);
 #ifdef CONFIG_PARTITION_UUIDS
 	uuid_bin_to_str(gpt_pte[part - 1].unique_partition_guid.b, info->uuid,
 			UUID_STR_FORMAT_GUID);
@@ -329,6 +338,37 @@ int test_part_efi(block_dev_desc_t * dev_desc)
 		return -1;
 	}
 	return 0;
+}
+
+int get_partition_count_efi(block_dev_desc_t * dev_desc)
+{
+	ALLOC_CACHE_ALIGN_BUFFER_PAD(gpt_header, gpt_head, 1, dev_desc->blksz);
+	gpt_entry *gpt_pte = NULL;
+
+	if (!dev_desc) {
+		printf("%s: Invalid Argument(s)\n", __func__);
+		return -1;
+	}
+
+	/* This function validates AND fills in the GPT header and PTE */
+	if (is_gpt_valid(dev_desc, GPT_PRIMARY_PARTITION_TABLE_LBA,
+			gpt_head, &gpt_pte) != 1) {
+		printf("%s: *** ERROR: Invalid GPT ***\n", __func__);
+		if (is_gpt_valid(dev_desc, (dev_desc->lba - 1),
+				 gpt_head, &gpt_pte) != 1) {
+			printf("%s: *** ERROR: Invalid Backup GPT ***\n",
+			       __func__);
+			if (gpt_pte != NULL)
+				free(gpt_pte);
+			return -1;
+		} else {
+			printf("%s: ***        Using Backup GPT ***\n",
+			       __func__);
+		}
+	}
+
+	free(gpt_pte);
+	return le32_to_cpu(gpt_head->num_partition_entries);
 }
 
 /**

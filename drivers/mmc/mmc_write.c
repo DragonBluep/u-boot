@@ -12,9 +12,10 @@
 #include <part.h>
 #include <div64.h>
 #include <linux/math64.h>
+#include <linux/log2.h>
 #include "mmc_private.h"
 
-static ulong mmc_erase_t(struct mmc *mmc, ulong start, lbaint_t blkcnt)
+static ulong mmc_erase_t(struct mmc *mmc, ulong start, lbaint_t blkcnt, int arg)
 {
 	struct mmc_cmd cmd;
 	ulong end;
@@ -51,7 +52,7 @@ static ulong mmc_erase_t(struct mmc *mmc, ulong start, lbaint_t blkcnt)
 		goto err_out;
 
 	cmd.cmdidx = MMC_CMD_ERASE;
-	cmd.cmdarg = MMC_ERASE_ARG;
+	cmd.cmdarg = arg;
 	cmd.resp_type = MMC_RSP_R1b;
 
 	err = mmc_send_cmd(mmc, &cmd, NULL);
@@ -71,11 +72,34 @@ unsigned long mmc_berase(int dev_num, lbaint_t start, lbaint_t blkcnt)
 	u32 start_rem, blkcnt_rem;
 	struct mmc *mmc = find_mmc_device(dev_num);
 	lbaint_t blk = 0, blk_r = 0;
-	int timeout = 1000;
+	int timeout;
+	unsigned int qty = 0;
+	int arg = MMC_ERASE_ARG;
+	unsigned long erase_shift;
 
 	if (!mmc)
 		return -1;
 
+	timeout = mmc->trim_timeout;
+	if (!(mmc->sec_feature_support & EXT_CSD_SEC_ER_EN)) {
+		return -1;
+	}
+
+	if (is_power_of_2(mmc->erase_grp_size))
+		erase_shift = __ffs(mmc->erase_grp_size) - 1;
+	else
+		erase_shift = 0;
+
+	if (erase_shift)
+		qty += (((start+blkcnt) >> erase_shift) -
+			(start >> erase_shift)) + 1;
+	else if (IS_SD(mmc))
+		qty += blkcnt;
+	else
+		qty += (((start+blkcnt) / mmc->erase_grp_size) -
+			(start / mmc->erase_grp_size)) + 1;
+
+	timeout *= qty;
 	/*
 	 * We want to see if the requested start or total block count are
 	 * unaligned.  We discard the whole numbers and only care about the
@@ -83,26 +107,72 @@ unsigned long mmc_berase(int dev_num, lbaint_t start, lbaint_t blkcnt)
 	 */
 	err = div_u64_rem(start, mmc->erase_grp_size, &start_rem);
 	err = div_u64_rem(blkcnt, mmc->erase_grp_size, &blkcnt_rem);
-	if (start_rem || blkcnt_rem)
+	if (start_rem || blkcnt_rem) {
+		if (mmc->sec_feature_support & EXT_CSD_SEC_GB_CL_EN) {
+			arg = MMC_SECURE_TRIM1_ARG;
+		} else {
 		printf("\n\nCaution! Your devices Erase group is 0x%x\n"
 		       "The erase range would be change to "
 		       "0x" LBAF "~0x" LBAF "\n\n",
 		       mmc->erase_grp_size, start & ~(mmc->erase_grp_size - 1),
 		       ((start + blkcnt + mmc->erase_grp_size)
 		       & ~(mmc->erase_grp_size - 1)) - 1);
+		}
+	}
 
-	while (blk < blkcnt) {
-		blk_r = ((blkcnt - blk) > mmc->erase_grp_size) ?
-			mmc->erase_grp_size : (blkcnt - blk);
-		err = mmc_erase_t(mmc, start + blk, blk_r);
-		if (err)
-			break;
+	if (arg != MMC_SECURE_TRIM1_ARG) {
+		while (blk < blkcnt) {
 
-		blk += blk_r;
+			blk_r = ((blkcnt - blk) > mmc->erase_grp_size) ?
+				mmc->erase_grp_size : (blkcnt - blk);
 
-		/* Waiting for the ready status */
-		if (mmc_send_status(mmc, timeout))
-			return 0;
+			err = mmc_erase_t(mmc, start + blk, blk_r, arg);
+
+			if (err)
+				break;
+
+			blk += blk_r;
+
+			/* Waiting for the ready status */
+			if (mmc_send_status(mmc, timeout))
+				return 0;
+		}
+
+		return blk;
+	} else {
+		if ( mmc->quirks & MMC_QUIRK_SECURE_TRIM ) {
+			arg = MMC_TRIM_ARG;
+			err = mmc_erase_t(mmc, start, blkcnt, arg);
+
+			if (err)
+				return -1;
+
+			/* Waiting for the ready status */
+			if (mmc_send_status(mmc, timeout))
+				return -1;
+		} else {
+			err = mmc_erase_t(mmc, start, blkcnt, arg);
+
+			if (err)
+				return -1;
+
+			/* Waiting for the ready status */
+			if (mmc_send_status(mmc, timeout))
+				return -1;
+
+			arg = MMC_SECURE_TRIM2_ARG;
+			err = mmc_erase_t(mmc, start, blkcnt, arg);
+
+			if (err)
+				return -1;
+
+			/* Waiting for the ready status */
+			if (mmc_send_status(mmc, timeout)) {
+				return 0;
+			}
+		}
+
+		return  blkcnt;
 	}
 
 	return blk;
@@ -114,6 +184,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 	struct mmc_cmd cmd;
 	struct mmc_data data;
 	int timeout = 1000;
+	int ret = blkcnt;
 
 	if ((start + blkcnt) > mmc->block_dev.lba) {
 		printf("MMC: block number 0x" LBAF " exceeds max(0x" LBAF ")\n",
@@ -142,7 +213,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 
 	if (mmc_send_cmd(mmc, &cmd, &data)) {
 		printf("mmc write failed\n");
-		return 0;
+		ret = 0;
 	}
 
 	/* SPI multiblock writes terminate using a special
@@ -162,7 +233,7 @@ static ulong mmc_write_blocks(struct mmc *mmc, lbaint_t start,
 	if (mmc_send_status(mmc, timeout))
 		return 0;
 
-	return blkcnt;
+	return ret;
 }
 
 ulong mmc_bwrite(int dev_num, lbaint_t start, lbaint_t blkcnt, const void *src)
@@ -176,6 +247,10 @@ ulong mmc_bwrite(int dev_num, lbaint_t start, lbaint_t blkcnt, const void *src)
 	if (mmc_set_blocklen(mmc, mmc->write_bl_len))
 		return 0;
 
+#if !defined(CONFIG_SYS_DCACHE_OFF)
+	flush_cache((unsigned long)src,
+		    (unsigned long)blkcnt * mmc->write_bl_len);
+#endif
 	do {
 		cur = (blocks_todo > mmc->cfg->b_max) ?
 			mmc->cfg->b_max : blocks_todo;

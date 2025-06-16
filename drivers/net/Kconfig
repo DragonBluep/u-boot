@@ -110,3 +110,49 @@ config ZYNQ_GEM
 	  This MAC is present in Xilinx Zynq and ZynqMP SoCs.
 
 endif # NETDEVICES
+
+config IPQ_QCA_AQUANTIA_PHY
+	bool "Aquantia PHY support"
+	help
+	  Enable Aquantia PHY support.
+
+config ATHRS17C_SWITCH
+	bool "QTI S17C switch support"
+	help
+	  Enable QTI S17C switch support.
+
+config QCA8084_PHY
+	depends on QCA8081_PHY
+	bool "Enable QCA8084 Ethernet Chip support"
+
+if QCA8084_PHY
+
+config QCA8084_PHY_MODE
+	bool "Enable QCA8084 PHY Mode support"
+	help
+	  Enable QCA8084 PHY Mode support.
+
+config QCA8084_SWT_MODE
+	bool "Enable QCA8084 Switch Mode support"
+	help
+	  Enable QCA8084 Switch Mode support.
+
+if QCA8084_SWT_MODE
+
+config QCA8084_BYPASS_MODE
+	bool "Enable QCA8084 By-pass support"
+	help
+	  Enable QCA808 By-pass support.
+
+endif # QCA8084_SWT_MODE
+
+config QCA8084_DEBUG
+	bool "Enable QCA8084 Debug support"
+	help
+	  Enable QCA8084 Debug support.
+
+endif # QCA8084_PHY
+
+config IPQ_QTI_BIT_BANGMII
+	bool "Enable MDIO Gpio bit bang support"
+	depends on BITBANGMII

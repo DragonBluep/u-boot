@@ -713,7 +713,8 @@ static inline int image_check_target_arch(const image_header_t *hdr)
 #ifndef IH_ARCH_DEFAULT
 # error "please define IH_ARCH_DEFAULT in your arch asm/u-boot.h"
 #endif
-	return image_check_arch(hdr, IH_ARCH_DEFAULT);
+	return image_check_arch(hdr, IH_ARCH_DEFAULT) || image_check_arch(hdr,
+		IH_ARCH_ARM64);
 }
 #endif /* USE_HOSTCC */
 
@@ -761,12 +762,14 @@ int bootz_setup(ulong image, ulong *start, ulong *end);
 #define FIT_IMAGES_PATH		"/images"
 #define FIT_CONFS_PATH		"/configurations"
 
-/* hash/signature node */
+/* hash/signature/key node */
 #define FIT_HASH_NODENAME	"hash"
 #define FIT_ALGO_PROP		"algo"
 #define FIT_VALUE_PROP		"value"
 #define FIT_IGNORE_PROP		"uboot-ignore"
 #define FIT_SIG_NODENAME	"signature"
+#define FIT_KEY_REQUIRED	"required"
+#define FIT_KEY_HINT		"key-name-hint"
 
 /* image node */
 #define FIT_DATA_PROP		"data"
@@ -788,6 +791,9 @@ int bootz_setup(ulong image, ulong *start, ulong *end);
 #define FIT_SETUP_PROP		"setup"
 
 #define FIT_MAX_HASH_LEN	HASH_MAX_DIGEST_SIZE
+
+/* An invalid size, meaning that the image size is not known */
+#define IMAGE_SIZE_INVAL	(-1UL)
 
 /* cmdline argument format parsing */
 int fit_parse_conf(const char *spec, ulong addr_curr,
@@ -885,10 +891,26 @@ int fit_image_check_os(const void *fit, int noffset, uint8_t os);
 int fit_image_check_arch(const void *fit, int noffset, uint8_t arch);
 int fit_image_check_type(const void *fit, int noffset, uint8_t type);
 int fit_image_check_comp(const void *fit, int noffset, uint8_t comp);
-int fit_check_format(const void *fit);
+/**
+ * fit_check_format() - Check that the FIT is valid
+ *
+ * This performs various checks on the FIT to make sure it is suitable for
+ * use, looking for mandatory properties, nodes, etc.
+ *
+ * If FIT_FULL_CHECK is enabled, it also runs it through libfdt to make
+ * sure that there are no strange tags or broken nodes in the FIT.
+ *
+ * @fit: pointer to the FIT format image header
+ * @return 0 if OK, -ENOEXEC if not an FDT file, -EINVAL if the full FDT check
+ *	failed (e.g. due to bad structure), -ENOMSG if the description is
+ *	missing, -ENODATA if the timestamp is missing, -ENOENT if the /images
+ *	path is missing
+ */
+int fit_check_format(const void *fit, ulong size);
 
 int fit_conf_find_compat(const void *fit, const void *fdt);
 int fit_conf_get_node(const void *fit, const char *conf_uname);
+int fdt_check_full(const void *fdt, size_t bufsize);
 
 /**
  * fit_conf_get_prop_node() - Get node refered to by a configuration
@@ -911,6 +933,9 @@ int fit_check_ramdisk(const void *fit, int os_noffset,
 
 int calculate_hash(const void *data, int data_len, const char *algo,
 			uint8_t *value, int *value_len);
+
+int bootm_load_os(bootm_headers_t *images, unsigned long *load_end,
+		  int boot_progress);
 
 /*
  * At present we only support signing on the host, and verification on the
@@ -1097,7 +1122,8 @@ struct image_region *fit_region_make_list(const void *fit,
 static inline int fit_image_check_target_arch(const void *fdt, int node)
 {
 #ifndef USE_HOSTCC
-	return fit_image_check_arch(fdt, node, IH_ARCH_DEFAULT);
+	return fit_image_check_arch(fdt, node, IH_ARCH_DEFAULT) ||
+		fit_image_check_arch(fdt, node, IH_ARCH_ARM64);
 #else
 	return 0;
 #endif

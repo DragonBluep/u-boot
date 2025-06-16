@@ -19,6 +19,118 @@ dtb-$(CONFIG_EXYNOS5) += exynos5250-arndale.dtb \
 	exynos5420-peach-pit.dtb \
 	exynos5800-peach-pi.dtb \
 	exynos5422-odroidxu3.dtb
+
+dtb-$(CONFIG_ARCH_IPQ807x) += ipq807x-hk01.dtb \
+	ipq807x-hk02.dtb \
+	ipq807x-hk06.dtb \
+	ipq807x-hk07.dtb \
+	ipq807x-hk08.dtb \
+	ipq807x-hk09.dtb \
+	ipq807x-hk10.dtb \
+	ipq807x-hk14.dtb \
+	ipq807x-hk11-c1.dtb \
+	ipq807x-ac01.dtb \
+	ipq807x-ac03.dtb \
+	ipq807x-ac04.dtb \
+	ipq807x-oak02.dtb \
+	ipq807x-hk01-c2.dtb \
+	ipq807x-hk01-c4.dtb \
+	ipq807x-hk01-c5.dtb \
+	ipq807x-hk10-c2.dtb \
+	ipq807x-db-hk02.dtb
+
+dtb-$(CONFIG_ARCH_IPQ806x) += ipq806x-ap148.dtb \
+	ipq806x-ap160.dtb \
+	ipq806x-ap160_2xx.dtb \
+	ipq806x-ap161.dtb \
+	ipq806x-db149.dtb \
+	ipq806x-ap145.dtb \
+	ipq806x-ap145_1xx.dtb \
+	ipq806x-ak01.dtb
+
+dtb-$(CONFIG_ARCH_IPQ40xx) += ipq40xx-dk01-c1.dtb \
+		ipq40xx-dk01-c2.dtb \
+		ipq40xx-dk04-c1.dtb \
+		ipq40xx-dk04-c2.dtb \
+		ipq40xx-dk04-c3.dtb \
+		ipq40xx-dk04-c4.dtb \
+		ipq40xx-dk07-c1.dtb \
+		ipq40xx-dk07-c2.dtb \
+		ipq40xx-dk07-c3.dtb \
+		ipq40xx-dk07-c4.dtb \
+		ipq40xx-dk01-s1.dtb \
+		ipq40xx-dk06-c1.dtb
+
+ifneq ($(CONFIG_IPQ_TINY),y)
+dtb-$(CONFIG_ARCH_IPQ5018) += ipq5018-emulation.dtb \
+			ipq5018-mp02.1.dtb \
+			ipq5018-mp03.1-c2.dtb \
+			ipq5018-mp03.1-c3.dtb \
+			ipq5018-mp03.3.dtb \
+			ipq5018-mp03.3-c2.dtb \
+			ipq5018-mp03.3-c3.dtb \
+			ipq5018-mp03.3-c4.dtb \
+			ipq5018-mp03.3-c5.dtb \
+			ipq5018-mp03.4-c1.dtb \
+			ipq5018-mp03.4-c2.dtb \
+			ipq5018-mp03.6-c1.dtb \
+			ipq5018-mp03.6-c2.dtb \
+			ipq5018-mp03.5-c1.dtb \
+			ipq5018-mp03.5-c2.dtb \
+			ipq5018-db-mp02.1.dtb \
+			ipq5018-db-mp03.1.dtb \
+			ipq5018-db-mp03.1-c2.dtb \
+			ipq5018-db-mp03.3.dtb \
+			ipq5018-db-mp03.3-c2.dtb \
+			ipq5018-tb-mp04.dtb \
+			ipq5018-mp03.1.dtb
+else
+dtb-$(CONFIG_ARCH_IPQ5018) += ipq5018-db-mp02.1.dtb \
+				ipq5018-mp02.1.dtb \
+				ipq5018-mp03.1.dtb \
+				ipq5018-db-mp03.1.dtb
+endif
+
+dtb-$(CONFIG_ARCH_IPQ5332) += ipq5332-emulation.dtb \
+				ipq5332-mi01.2.dtb \
+				ipq5332-mi01.2-qcn9160-c1.dtb \
+				ipq5332-mi01.3.dtb \
+				ipq5332-mi01.4.dtb \
+				ipq5332-mi01.6.dtb \
+				ipq5332-mi01.9.dtb \
+				ipq5332-mi03.1.dtb \
+				ipq5332-mi04.1.dtb \
+				ipq5332-db-mi01.1.dtb \
+				ipq5332-db-mi02.1.dtb \
+				ipq5332-db-mi03.1.dtb
+
+dtb-$(CONFIG_ARCH_IPQ6018) += ipq6018-cp01-c1.dtb \
+			ipq6018-cp02-c1.dtb \
+			ipq6018-cp03-c1.dtb \
+			ipq6018-db-cp01.dtb \
+			ipq6018-db-cp02.dtb
+
+dtb-$(CONFIG_ARCH_IPQ9574) += ipq9574-al01-c1.dtb \
+			ipq9574-al02-c1.dtb \
+			ipq9574-al03-c1.dtb \
+			ipq9574-al02-c2.dtb \
+			ipq9574-al02-c3.dtb \
+			ipq9574-al02-c4.dtb \
+			ipq9574-al02-c7.dtb \
+			ipq9574-al02-c8.dtb \
+			ipq9574-al02-c9.dtb \
+			ipq9574-al02-c10.dtb \
+			ipq9574-al02-c13.dtb \
+			ipq9574-al02-c17.dtb \
+			ipq9574-al02-c18.dtb \
+			ipq9574-al02-c19.dtb \
+			ipq9574-db-al01-c1.dtb \
+			ipq9574-db-al01-c2.dtb \
+			ipq9574-db-al01-c3.dtb \
+			ipq9574-db-al02-c1.dtb \
+			ipq9574-db-al02-c2.dtb \
+			ipq9574-db-al02-c3.dtb
+
 dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3288-firefly.dtb \
 	rk3288-jerry.dtb \
@@ -200,7 +312,22 @@ targets += $(dtb-y)
 DTC_FLAGS +=
 
 PHONY += dtbs
-dtbs: $(addprefix $(obj)/, $(dtb-y))
+
+ifneq ($(CONFIG_OF_COMBINE),)
+
+%(obj)/%.dtb.comb.S: %(obj)/%.dtb
 	@:
 
-clean-files := *.dtb
+$(obj)/dtbtable.S: $(addsuffix .comb.o, $(addprefix $(obj)/, $(dtb-y)))
+	@:
+
+obj-y := dtbtable.o $(addsuffix .comb.o, $(dtb-y))
+
+targets += obj-$(CONFIG_OF_EMBED)
+
+else
+dtbs: $(addprefix $(obj)/, $(dtb-y))
+	@:
+endif
+
+clean-files := *.dtb *.o *.S

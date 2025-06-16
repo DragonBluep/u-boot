@@ -22,7 +22,7 @@ __weak void arm_init_domains(void)
 {
 }
 
-static void cp_delay (void)
+void cp_delay (void)
 {
 	volatile int i;
 
@@ -62,6 +62,57 @@ void mmu_set_region_dcache_behaviour(phys_addr_t start, size_t size,
 	mmu_page_table_flush((u32)&page_table[start], (u32)&page_table[end]);
 }
 
+#if defined(CONFIG_IPQ_NO_RELOC)
+#define UBOOT_CACHE_SETUP	0x100e
+#define GEN_CACHE_SETUP		0x101e
+
+__weak void dram_bank_mmu_setup(int bank)
+{
+	bd_t *bd = gd->bd;
+	unsigned long long	i;
+
+	debug("%s: bank: %d\n", __func__, bank);
+	for (i = bd->bi_dram[bank].start >> 20;
+	     i < ((unsigned long long)bd->bi_dram[bank].start + (unsigned long long)bd->bi_dram[bank].size) >> 20;
+	     i++) {
+		/* Set XN bit for all dram regions except uboot code region */
+		if (i >= (CONFIG_SYS_TEXT_BASE >> 20) && i < ((CONFIG_SYS_TEXT_BASE + 0x100000) >> 20))
+			set_section_dcache(i, UBOOT_CACHE_SETUP);
+		else
+			set_section_dcache(i, GEN_CACHE_SETUP);
+	}
+}
+
+/* to activate the MMU we need to set up virtual memory: use 1M areas */
+void mmu_setup(void)
+{
+	int i;
+	u32 reg;
+
+	arm_init_before_mmu();
+	memset((void *)gd->arch.tlb_addr, 0, gd->arch.tlb_size);
+	/* Set up an identity-mapping for all 4GB, rw for everyone */
+	for (i = 0; i < 4096; i++)
+		set_section_dcache(i, SHARED_DEVICE);
+
+	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
+		dram_bank_mmu_setup(i);
+	}
+
+	/* Copy the page table address to cp15 */
+	asm volatile("mcr p15, 0, %0, c2, c0, 0"
+		     : : "r" (gd->arch.tlb_addr) : "memory");
+
+	/* Set the access control to all clients */
+	set_dacr(0x55555555);
+
+	/* and enable the mmu */
+	reg = get_cr();	/* get control reg. */
+	cp_delay();
+	set_cr(reg | CR_M);
+}
+
+#else
 __weak void dram_bank_mmu_setup(int bank)
 {
 	bd_t *bd = gd->bd;
@@ -82,7 +133,7 @@ __weak void dram_bank_mmu_setup(int bank)
 }
 
 /* to activate the MMU we need to set up virtual memory: use 1M areas */
-static inline void mmu_setup(void)
+void mmu_setup(void)
 {
 	int i;
 	u32 reg;
@@ -124,8 +175,9 @@ static inline void mmu_setup(void)
 	cp_delay();
 	set_cr(reg | CR_M);
 }
+#endif
 
-static int mmu_enabled(void)
+int mmu_enabled(void)
 {
 	return get_cr() & CR_M;
 }

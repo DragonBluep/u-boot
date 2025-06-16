@@ -12,6 +12,7 @@
 
 #include <linux/types.h>
 #include <linux/compiler.h>
+#include <linux/compat.h>
 
 /* Dual SPI flash memories - see SPI_COMM_DUAL_... */
 enum spi_dual_flash {
@@ -46,6 +47,7 @@ enum {
 	E_FSR		= 1 << 2,
 	SST_WR		= 1 << 3,
 	WR_QPP		= 1 << 4,
+	SECT_64K	= 1 << 5,
 };
 
 enum spi_nor_option_flags {
@@ -54,8 +56,10 @@ enum spi_nor_option_flags {
 };
 
 #define SPI_FLASH_3B_ADDR_LEN		3
-#define SPI_FLASH_CMD_LEN		(1 + SPI_FLASH_3B_ADDR_LEN)
+#define SPI_FLASH_4B_ADDR_LEN		4
 #define SPI_FLASH_16MB_BOUN		0x1000000
+
+#define SPI_FLASH_CMD_EN4B		0xb7       /* Enter 4-byte mode */
 
 /* CFI Manufacture ID's */
 #define SPI_FLASH_CFI_MFR_SPANSION	0x01
@@ -64,6 +68,7 @@ enum spi_nor_option_flags {
 #define SPI_FLASH_CFI_MFR_SST		0xbf
 #define SPI_FLASH_CFI_MFR_WINBOND	0xef
 #define SPI_FLASH_CFI_MFR_ATMEL		0x1f
+#define SPI_FLASH_CFI_MFR_GIGA		0xc8
 
 /* Erase commands */
 #define CMD_ERASE_4K			0x20
@@ -112,6 +117,7 @@ enum spi_nor_option_flags {
 #define SPI_FLASH_PROG_TIMEOUT		(2 * CONFIG_SYS_HZ)
 #define SPI_FLASH_PAGE_ERASE_TIMEOUT	(5 * CONFIG_SYS_HZ)
 #define SPI_FLASH_SECTOR_ERASE_TIMEOUT	(10 * CONFIG_SYS_HZ)
+#define SPI_FLASH_BERASE_TIMEOUT(f)	((f)->berase_timeout * CONFIG_SYS_HZ)
 
 /* SST specific */
 #ifdef CONFIG_SPI_FLASH_SST
@@ -144,6 +150,7 @@ struct spi_flash_params {
 	u32 nr_sectors;
 	u8 e_rd_cmd;
 	u16 flags;
+	u16 bulkerase_timeout;		/* in seconds */
 };
 
 extern const struct spi_flash_params spi_flash_params_table[];
@@ -237,4 +244,6 @@ void spi_flash_mtd_unregister(void);
  */
 int spi_flash_scan(struct spi_flash *flash);
 
+int spi_nand_flash_probe(struct spi_slave *spi, struct spi_flash *flash,
+			 u8 *idcode);
 #endif /* _SF_INTERNAL_H_ */

@@ -63,7 +63,7 @@ int debug_server_parse_firmware_fit_image(const void **raw_image_addr,
 		goto out_error;
 	}
 
-	if (!fit_check_format(fit_hdr)) {
+	if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 		printf("Debug Server FW: Bad FIT image format\n");
 		goto out_error;
 	}

@@ -90,6 +90,11 @@ int bb_miiphy_read(const char *devname, unsigned char addr,
 		    unsigned char reg, unsigned short *value);
 int bb_miiphy_write(const char *devname, unsigned char addr,
 		     unsigned char reg, unsigned short value);
+int bb_miiphy_read_v2(const char *devname, unsigned int addr,
+		    unsigned int reg, unsigned short *value);
+int bb_miiphy_write_v2(const char *devname, unsigned int addr,
+		     unsigned int reg, unsigned short value);
+
 #endif
 
 /* phy seed setup */

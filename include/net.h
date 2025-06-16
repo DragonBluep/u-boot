@@ -19,6 +19,14 @@
 #include <asm/cache.h>
 #include <asm/byteorder.h>	/* for nton* / ntoh* stuff */
 
+#define PORT0					0
+#define PORT1					1
+#define PORT2					2
+#define PORT3					3
+#define PORT4					4
+#define PORT5					5
+#define PORT6					6
+
 #define DEBUG_LL_STATE 0	/* Link local state machine changes */
 #define DEBUG_DEV_PKT 0		/* Packets or info directed to the device */
 #define DEBUG_NET_PKT 0		/* Packets on info on the network at large */
@@ -278,7 +286,7 @@ struct ethernet_hdr {
 	u8		et_dest[6];	/* Destination node		*/
 	u8		et_src[6];	/* Source node			*/
 	u16		et_protlen;	/* Protocol or length		*/
-};
+} __attribute__((packed));
 
 /* Ethernet header size */
 #define ETHER_HDR_SIZE	(sizeof(struct ethernet_hdr))
@@ -296,7 +304,7 @@ struct e802_hdr {
 	u8		et_snap2;
 	u8		et_snap3;
 	u16		et_prot;	/* 802 protocol			*/
-};
+} __attribute__((packed));
 
 /* 802 + SNAP + ethernet header size */
 #define E802_HDR_SIZE	(sizeof(struct e802_hdr))
@@ -310,7 +318,7 @@ struct vlan_ethernet_hdr {
 	u16		vet_vlan_type;	/* PROT_VLAN			*/
 	u16		vet_tag;	/* TAG of VLAN			*/
 	u16		vet_type;	/* protocol type		*/
-};
+} __attribute__((packed));
 
 /* VLAN Ethernet header size */
 #define VLAN_ETHER_HDR_SIZE	(sizeof(struct vlan_ethernet_hdr))
@@ -337,7 +345,7 @@ struct ip_hdr {
 	u16		ip_sum;		/* checksum			*/
 	struct in_addr	ip_src;		/* Source IP address		*/
 	struct in_addr	ip_dst;		/* Destination IP address	*/
-};
+} __attribute__((packed));
 
 #define IP_OFFS		0x1fff /* ip offset *= 8 */
 #define IP_FLAGS	0xe000 /* first 3 bits */
@@ -365,7 +373,7 @@ struct ip_udp_hdr {
 	u16		udp_dst;	/* UDP destination port		*/
 	u16		udp_len;	/* Length of UDP packet		*/
 	u16		udp_xsum;	/* Checksum			*/
-};
+} __attribute__((packed));
 
 #define IP_UDP_HDR_SIZE		(sizeof(struct ip_udp_hdr))
 #define UDP_HDR_SIZE		(IP_UDP_HDR_SIZE - IP_HDR_SIZE)
@@ -404,7 +412,7 @@ struct arp_hdr {
 	u8		ar_tha[];	/* Target hardware address	*/
 	u8		ar_tpa[];	/* Target protocol address	*/
 #endif /* 0 */
-};
+} __attribute__((packed));
 
 #define ARP_HDR_SIZE	(8+20)		/* Size assuming ethernet	*/
 
@@ -439,7 +447,7 @@ struct icmp_hdr {
 		} frag;
 		u8 data[0];
 	} un;
-};
+} __attribute__((packed));
 
 #define ICMP_HDR_SIZE		(sizeof(struct icmp_hdr))
 #define IP_ICMP_HDR_SIZE	(IP_HDR_SIZE + ICMP_HDR_SIZE)
@@ -456,8 +464,8 @@ struct icmp_hdr {
  * maximum packet size =  1518
  * maximum packet size and multiple of 32 bytes =  1536
  */
-#define PKTSIZE			1518
-#define PKTSIZE_ALIGN		1536
+#define PKTSIZE			2048
+#define PKTSIZE_ALIGN		2048
 /*#define PKTSIZE		608*/
 
 /*
@@ -510,7 +518,7 @@ extern ushort		net_our_vlan;		/* Our VLAN */
 extern ushort		net_native_vlan;	/* Our Native VLAN */
 
 extern int		net_restart_wrap;	/* Tried all network devices */
-
+extern int 		tftp_our_port;
 enum proto_t {
 	BOOTP, RARP, ARP, TFTPGET, DHCP, PING, DNS, NFS, CDP, NETCONS, SNTP,
 	TFTPSRV, TFTPPUT, LINKLOCAL

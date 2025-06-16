@@ -132,7 +132,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			"at %08lx ...\n", uname, addr);
 
 		fit_hdr = (const void *)addr;
-		if (!fit_check_format(fit_hdr)) {
+		if (fit_check_format(fit_hdr, IMAGE_SIZE_INVAL)) {
 			puts("Bad FIT image format\n");
 			return 1;
 		}
@@ -144,7 +144,7 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 
-		if (fit_image_check_comp(fit_hdr, noffset, IH_COMP_NONE)
+		if (!fit_image_check_comp(fit_hdr, noffset, IH_COMP_NONE)
 		    && (argc < 4)) {
 			printf("Must specify load address for %s command "
 				"with compressed image\n",
@@ -247,9 +247,8 @@ do_imgextract(cmd_tbl_t * cmdtp, int flag, int argc, char * const argv[])
 			return 1;
 		}
 		puts("OK\n");
+		flush_cache(dest, len);
 	}
-
-	flush_cache(dest, len);
 
 	setenv_hex("fileaddr", data);
 	setenv_hex("filesize", len);

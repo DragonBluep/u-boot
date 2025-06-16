@@ -39,6 +39,7 @@
 #define TFTP_ERROR	5
 #define TFTP_OACK	6
 
+DECLARE_GLOBAL_DATA_PTR;
 static ulong timeout_ms = TIMEOUT;
 static int timeout_count_max = TIMEOUT_COUNT;
 static ulong time_start;   /* Record time we started tftp */
@@ -69,7 +70,7 @@ static struct in_addr tftp_remote_ip;
 /* The UDP port at their end */
 static int	tftp_remote_port;
 /* The UDP port at our end */
-static int	tftp_our_port;
+int	tftp_our_port;
 static int	timeout_count;
 /* packet sequence number */
 static ulong	tftp_cur_block;
@@ -190,6 +191,21 @@ static inline void store_block(int block, uchar *src, unsigned len)
 	} else
 #endif /* CONFIG_SYS_DIRECT_FLASH_TFTP */
 	{
+		/*
+		 * The file to be tftp'ed should not overwrite the
+		 * code/stack area.
+		 */
+#ifdef CONFIG_IPQ806X
+		if ((load_addr + newsize) >= IPQ_TFTP_MAX_ADDR) {
+#else
+		if (((load_addr + newsize) >= CONFIG_SYS_SDRAM_END) ||
+		    (((load_addr + newsize) >= CONFIG_IPQ_FDT_HIGH) &&
+		     ((load_addr + newsize) < CONFIG_TZ_END_ADDR))) {
+#endif /* CONFIG_IPQ806X */
+			puts("\nError file size too large\n");
+			net_set_state(NETLOOP_FAIL);
+			return;
+		}
 		void *ptr = map_sysmem(load_addr + offset, len);
 
 		memcpy(ptr, src, len);
@@ -451,6 +467,8 @@ static void icmp_handler(unsigned type, unsigned code, unsigned dest,
 {
 	if (type == ICMP_NOT_REACH && code == ICMP_NOT_REACH_PORT) {
 		/* Oh dear the other end has gone away */
+		printf("TFTP server dies: print the pkt buffer\n");
+		print_buffer(0, pkt, 1, len, 0);
 		restart("TFTP server died");
 	}
 }
@@ -498,6 +516,7 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 				int block = ntohs(*s);
 				int ack_ok = (tftp_cur_block == block);
 
+				tftp_prev_block = tftp_cur_block;
 				tftp_cur_block = (unsigned short)(block + 1);
 				update_block_number();
 				if (ack_ok)
@@ -525,7 +544,11 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 		debug("Got OACK: %s %s\n",
 		      pkt, pkt + strlen((char *)pkt) + 1);
 		tftp_state = STATE_OACK;
-		tftp_remote_port = src;
+		if (tftp_remote_port != src) {
+			printf("\nGot TFTP_OACK: TFTP remote port: changes from %d to %d\n",
+				tftp_remote_port, src);
+			tftp_remote_port = src;
+		}
 		/*
 		 * Check for 'blksize' option.
 		 * Careful: "i" is signed, "len" is unsigned, thus
@@ -578,7 +601,11 @@ static void tftp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 		    tftp_state == STATE_RECV_WRQ) {
 			/* first block received */
 			tftp_state = STATE_DATA;
-			tftp_remote_port = src;
+			if (tftp_remote_port != src) {
+				printf("\nGot TFTP_DATA: TFTP remote port: changes from %d to %d\n",
+					tftp_remote_port, src);
+				tftp_remote_port = src;
+			}
 			new_transfer();
 
 #ifdef CONFIG_MCAST_TFTP
@@ -802,6 +829,23 @@ void tftp_start(enum proto_t protocol)
 #endif
 	{
 		printf("Load address: 0x%lx\n", load_addr);
+		/*
+		 * Do not load files to the reserved region or the
+		 * region where linux is executed.
+		 */
+#ifdef CONFIG_IPQ806X
+		if ((load_addr < IPQ_TFTP_MIN_ADDR) ||
+			(load_addr >= IPQ_TFTP_MAX_ADDR)) {
+#else
+		if ((load_addr < IPQ_TFTP_MIN_ADDR) ||
+		    (load_addr >= CONFIG_SYS_SDRAM_END) ||
+		    ((load_addr >= CONFIG_IPQ_FDT_HIGH) &&
+		    (load_addr < CONFIG_TZ_END_ADDR))) {
+#endif /* CONFIG_IPQ806X */
+			puts("\nError specified load address not allowed\n");
+			net_set_state(NETLOOP_FAIL);
+			return;
+		}
 		puts("Loading: *\b");
 		tftp_state = STATE_SEND_RRQ;
 	}

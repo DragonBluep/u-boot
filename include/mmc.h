@@ -14,6 +14,14 @@
 #include <linux/compiler.h>
 #include <part.h>
 
+#define MMC_GET_MID(CID0) (CID0 >> 24)
+#define MMC_GET_PNM(CID0, CID1, CID2) (((long long int)(CID0 & 0xff) << 40) |	\
+		((long long int)CID1 << 8) |					\
+		(CID2 >> 24))
+
+#define MMC_MID_MICRON 0xFE
+#define MMC_PNM_MICRON 0x4D4D43333247  // MMC32G
+
 /* SD/MMC version bits; 8 flags, 8 major, 8 minor, 8 change */
 #define SD_VERSION_SD	(1U << 31)
 #define MMC_VERSION_MMC	(1U << 30)
@@ -49,6 +57,7 @@
 #define MMC_VERSION_4_41	MAKE_MMC_VERSION(4, 4, 1)
 #define MMC_VERSION_4_5		MAKE_MMC_VERSION(4, 5, 0)
 #define MMC_VERSION_5_0		MAKE_MMC_VERSION(5, 0, 0)
+#define MMC_VERSION_5_1		MAKE_MMC_VERSION(5, 1, 0)
 
 #define MMC_MODE_HS		(1 << 0)
 #define MMC_MODE_HS_52MHz	(1 << 1)
@@ -89,6 +98,10 @@
 #define MMC_CMD_SET_BLOCK_COUNT         23
 #define MMC_CMD_WRITE_SINGLE_BLOCK	24
 #define MMC_CMD_WRITE_MULTIPLE_BLOCK	25
+#define MMC_CMD_SET_WRITE_PROT		28
+#define MMC_CMD_CLR_WRITE_PROT		29
+#define MMC_CMD_SEND_WRITE_PROT		30
+#define MMC_CMD_SEND_WRITE_PROT_TYPE	31
 #define MMC_CMD_ERASE_GROUP_START	35
 #define MMC_CMD_ERASE_GROUP_END		36
 #define MMC_CMD_ERASE			38
@@ -166,6 +179,17 @@
 #define SD_SWITCH_CHECK		0
 #define SD_SWITCH_SWITCH	1
 
+#define MMC_RESP_TIMEOUT		2000
+#define MMC_ADDR_OUT_OF_RANGE(resp)	((resp >> 31) & 0x01)
+
+/*
+ * CSD fields
+*/
+#define WP_GRP_ENABLE(csd)		((csd[3] & 0x80000000) >> 31)
+#define WP_GRP_SIZE(csd)		((csd[2] & 0x0000001f))
+#define ERASE_GRP_MULT(csd)		((csd[2] & 0x000003e0) >> 5)
+#define ERASE_GRP_SIZE(csd)		((csd[2] & 0x00007c00) >> 10)
+
 /*
  * EXT_CSD fields
  */
@@ -180,6 +204,7 @@
 #define EXT_CSD_WR_REL_PARAM		166	/* R */
 #define EXT_CSD_WR_REL_SET		167	/* R/W */
 #define EXT_CSD_RPMB_MULT		168	/* RO */
+#define EXT_CSD_USER_WP			171	/* R/W */
 #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
 #define EXT_CSD_BOOT_BUS_WIDTH		177
 #define EXT_CSD_PART_CONF		179	/* R/W */
@@ -191,7 +216,11 @@
 #define EXT_CSD_HC_WP_GRP_SIZE		221	/* RO */
 #define EXT_CSD_HC_ERASE_GRP_SIZE	224	/* RO */
 #define EXT_CSD_BOOT_MULT		226	/* RO */
+#define EXT_CSD_SEC_FEATURE_SUPPORT     231     /* RO */
+#define EXT_CSD_TRIM_MULT		232	/* RO */
 
+#define EXT_CSD_SEC_ER_EN       (1 << 0)
+#define EXT_CSD_SEC_GB_CL_EN    (1 << 4)
 /*
  * EXT_CSD field definitions
  */
@@ -236,6 +265,11 @@
 #define EXT_CSD_WR_DATA_REL_USR		(1 << 0)	/* user data area WR_REL */
 #define EXT_CSD_WR_DATA_REL_GP(x)	(1 << ((x)+1))	/* GP part (x+1) WR_REL */
 
+#define EXT_CSD_US_PERM_WP_DIS		(1 << 4)
+#define EXT_CSD_US_PWR_WP_DIS		(1 << 3)
+#define EXT_CSD_US_PERM_WP_EN		(1 << 2)
+#define EXT_CSD_US_PWR_WP_EN		(1 << 0)
+
 #define R1_ILLEGAL_COMMAND		(1 << 22)
 #define R1_APP_CMD			(1 << 5)
 
@@ -273,6 +307,17 @@
 
 /* Driver model support */
 
+#define MMC_MID_MASK (0xFF << 24)
+#define MMC_MID_SANDISK (0x45 << 24)
+#define MMC_MID_TOSHIBA (0x11 << 24)
+
+/*
+ * Quirks
+ */
+/* Some of Sandisk eMMC seeing more delay for secure trim,
+ * below quirk will use trim instead secure trim for erase */
+#define MMC_QUIRK_SECURE_TRIM (1 << 0)
+
 /**
  * struct mmc_uclass_priv - Holds information about a device used by the uclass
  */
@@ -292,6 +337,10 @@ struct mmc_uclass_priv {
 struct mmc *mmc_get_mmc_dev(struct udevice *dev);
 
 /* End of driver model support */
+
+#define MMC_SECURE_TRIM1_ARG    0x80000001
+#define MMC_SECURE_TRIM2_ARG    0x80008000
+
 
 struct mmc_cid {
 	unsigned long psn;
@@ -370,6 +419,8 @@ struct mmc {
 	uint write_bl_len;
 	uint erase_grp_size;	/* in 512-byte sectors */
 	uint hc_wp_grp_size;	/* in 512-byte sectors */
+	uint wp_grp_size;
+	uint wp_grp_enable;
 	u64 capacity;
 	u64 capacity_user;
 	u64 capacity_boot;
@@ -382,6 +433,9 @@ struct mmc {
 	char init_in_progress;	/* 1 if we have done mmc_start_init() */
 	char preinit;		/* start init as early as possible */
 	int ddr_mode;
+	uchar sec_feature_support;
+	unsigned int trim_timeout; /* In milliseconds */
+	u32 quirks;
 };
 
 struct mmc_hwpart_conf {
@@ -494,6 +548,9 @@ struct pci_device_id;
  */
 int pci_mmc_init(const char *name, struct pci_device_id *mmc_supported,
 		 int num_ids);
+
+int mmc_write_protect(struct mmc *mmc, unsigned int start_blk,
+		      unsigned int cnt_blk, int set_clr);
 
 /* Set block count limit because of 16 bit register limit on some hardware*/
 #ifndef CONFIG_SYS_MMC_MAX_BLK_COUNT

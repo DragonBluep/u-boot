@@ -19,6 +19,8 @@
 #include <asm/io.h>
 #include <dm/device-internal.h>
 
+DECLARE_GLOBAL_DATA_PTR;
+
 static struct spi_flash *flash;
 
 /*
@@ -135,8 +137,7 @@ static int do_spi_flash_probe(int argc, char * const argv[])
 
 	flash = dev_get_uclass_priv(new);
 #else
-	if (flash)
-		spi_flash_free(flash);
+	spi_flash_free(flash);
 
 	new = spi_flash_probe(bus, cs, speed, mode);
 	flash = new;
@@ -266,6 +267,7 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 	int ret = 1;
 	int dev = 0;
 	loff_t offset, len, maxsize;
+	u64 sram_end = CONFIG_SYS_SDRAM_BASE + (u64)gd->ram_size;
 
 	if (argc < 3)
 		return -1;
@@ -282,6 +284,16 @@ static int do_spi_flash_read_write(int argc, char * const argv[])
 	if (offset + len > flash->size) {
 		printf("ERROR: attempting %s past flash size (%#x)\n",
 		       argv[0], flash->size);
+		return 1;
+	}
+	/* Validate DDR region address */
+	if ((addr < CONFIG_SYS_SDRAM_BASE) || (addr > (sram_end - 1))) {
+		puts("Invalid RAM address \n");
+		return 1;
+	}
+
+	if ((addr + len) > sram_end) {
+		puts("No space available\n");
 		return 1;
 	}
 
@@ -346,6 +358,22 @@ static int do_spi_flash_erase(int argc, char * const argv[])
 	       ret ? "ERROR" : "OK");
 
 	return ret == 0 ? 0 : 1;
+}
+
+static int do_spi_flash_berase(int argc, char * const argv[])
+{
+	switch (spi_flash_berase(flash)) {
+	case 0:
+		return 0;
+	case -ENOTSUPP:
+		printf("SPI flash %s not supported\n", argv[0]);
+		return 1;
+	default:
+		printf("SPI flash %s failed\n", argv[0]);
+		return 1;
+	}
+
+	return 1;
 }
 
 static int do_spi_protect(int argc, char * const argv[])
@@ -577,6 +605,8 @@ static int do_spi_flash(cmd_tbl_t *cmdtp, int flag, int argc,
 	else if (!strcmp(cmd, "test"))
 		ret = do_spi_flash_test(argc, argv);
 #endif
+	else if (strcmp(cmd, "bulkerase") == 0)
+		ret = do_spi_flash_berase(argc, argv);
 	else
 		ret = -1;
 
@@ -614,5 +644,7 @@ U_BOOT_CMD(
 	"					  or to start of mtd `partition'\n"
 	"sf protect lock/unlock sector len	- protect/unprotect 'len' bytes starting\n"
 	"					  at address 'sector'\n"
+	"sf bulkerase				- Erase entire flash chip\n"
+	"						(Not supported on all devices)\n"
 	SF_TEST_HELP
 );

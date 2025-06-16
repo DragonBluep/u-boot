@@ -50,8 +50,8 @@ static struct descriptor {
 		cpu_to_le16(0x8), /* wHubCharacteristics */
 		10,		/* bPwrOn2PwrGood */
 		0,		/* bHubCntrCurrent */
-		{},		/* Device removable */
-		{}		/* at most 7 ports! XXX */
+		{		/* Device removable */
+		}		/* at most 7 ports! XXX */
 	},
 	{
 		0x12,		/* bLength */
@@ -415,8 +415,7 @@ static int xhci_address_device(struct usb_device *udev, int root_portnr)
 	 * so setting up the slot context.
 	 */
 	debug("Setting up addressable devices %p\n", ctrl->dcbaa);
-	xhci_setup_addressable_virt_dev(ctrl, udev->slot_id, udev->speed,
-					root_portnr);
+	xhci_setup_addressable_virt_dev(ctrl, udev, root_portnr);
 
 	ctrl_ctx = xhci_get_input_control_ctx(virt_dev->in_ctx);
 	ctrl_ctx->add_flags = cpu_to_le32(SLOT_FLAG | EP0_FLAG);
@@ -568,7 +567,7 @@ int xhci_check_maxpacket(struct usb_device *udev)
 				ctrl->devs[slot_id]->out_ctx, ep_index);
 		in_ctx = ctrl->devs[slot_id]->in_ctx;
 		ep_ctx = xhci_get_ep_ctx(ctrl, in_ctx, ep_index);
-		ep_ctx->ep_info2 &= cpu_to_le32(~MAX_PACKET_MASK);
+		ep_ctx->ep_info2 &= cpu_to_le32(~MAX_PACKET(MAX_PACKET_MASK));
 		ep_ctx->ep_info2 |= cpu_to_le32(MAX_PACKET(max_packet_size));
 
 		/*
@@ -727,6 +726,7 @@ static int xhci_submit_root(struct usb_device *udev, unsigned long pipe,
 	case USB_REQ_GET_DESCRIPTOR | ((USB_DIR_IN | USB_RT_HUB) << 8):
 		switch (le16_to_cpu(req->value) >> 8) {
 		case USB_DT_HUB:
+		case USB_DT_SS_HUB:
 			debug("USB_DT_HUB config\n");
 			srcptr = &descriptor.hub;
 			srclen = 0x8;
@@ -1111,26 +1111,6 @@ int usb_lowlevel_stop(int index)
 #endif /* CONFIG_DM_USB */
 
 #ifdef CONFIG_DM_USB
-/*
-static struct usb_device *get_usb_device(struct udevice *dev)
-{
-	struct usb_device *udev;
-
-	if (device_get_uclass_id(dev) == UCLASS_USB)
-		udev = dev_get_uclass_priv(dev);
-	else
-		udev = dev_get_parent_priv(dev);
-
-	return udev;
-}
-*/
-static bool is_root_hub(struct udevice *dev)
-{
-	if (device_get_uclass_id(dev->parent) != UCLASS_USB_HUB)
-		return true;
-
-	return false;
-}
 
 static int xhci_submit_control_msg(struct udevice *dev, struct usb_device *udev,
 				   unsigned long pipe, void *buffer, int length,
@@ -1145,10 +1125,10 @@ static int xhci_submit_control_msg(struct udevice *dev, struct usb_device *udev,
 	hub = udev->dev;
 	if (device_get_uclass_id(hub) == UCLASS_USB_HUB) {
 		/* Figure out our port number on the root hub */
-		if (is_root_hub(hub)) {
+		if (usb_hub_is_root_hub(hub)) {
 			root_portnr = udev->portnr;
 		} else {
-			while (!is_root_hub(hub->parent))
+			while (!usb_hub_is_root_hub(hub->parent))
 				hub = hub->parent;
 			uhop = dev_get_parent_priv(hub);
 			root_portnr = uhop->portnr;

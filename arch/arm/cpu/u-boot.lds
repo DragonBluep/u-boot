@@ -78,6 +78,18 @@ SECTIONS
 		*(.data*)
 	}
 
+	. = ALIGN(64);
+	.nocache : {
+		KEEP(*(.nocache*));
+	}
+
+#ifdef CONFIG_OF_COMBINE
+	. = ALIGN(4);
+	.dtb : {
+		KEEP(*(.dtb.combine*));
+	}
+#endif
+
 	. = ALIGN(4);
 
 	. = .;
@@ -147,9 +159,9 @@ SECTIONS
 	.dynsym _image_binary_end : { *(.dynsym) }
 	.dynbss : { *(.dynbss) }
 	.dynstr : { *(.dynstr*) }
-	.dynamic : { *(.dynamic*) }
+	/DISCARD/ : { *(.dynamic*) }
 	.plt : { *(.plt*) }
-	.interp : { *(.interp*) }
+	/DISCARD/ : { *(.interp*) }
 	.gnu.hash : { *(.gnu.hash) }
 	.gnu : { *(.gnu*) }
 	.ARM.exidx : { *(.ARM.exidx*) }

@@ -14,8 +14,13 @@
 
 #include "libfdt_internal.h"
 
+#define ULONG_MAX       (~0UL)
+
 int fdt_check_header(const void *fdt)
 {
+	uintptr_t fdt_start, fdt_end;
+	fdt_start = (uintptr_t)fdt;
+
 	if (fdt_magic(fdt) == FDT_MAGIC) {
 		/* Complete tree */
 		if (fdt_version(fdt) < FDT_FIRST_SUPPORTED_VERSION)
@@ -29,6 +34,24 @@ int fdt_check_header(const void *fdt)
 	} else {
 		return -FDT_ERR_BADMAGIC;
 	}
+
+	if(fdt_start + fdt_totalsize(fdt) < fdt_start)
+	{
+		return FDT_ERR_BADOFFSET;
+	}
+	fdt_end = fdt_start + fdt_totalsize(fdt);
+
+	if (((uint64_t)fdt_start + (uint64_t)fdt_off_dt_struct(fdt) + (uint64_t)fdt_size_dt_struct(fdt)) > ULONG_MAX)
+		return FDT_ERR_BADOFFSET;
+
+	if ((fdt_start + fdt_off_dt_struct(fdt) + fdt_size_dt_struct(fdt)) > fdt_end)
+		return FDT_ERR_BADOFFSET;
+
+	if (((uint64_t)fdt_start + (uint64_t)fdt_off_dt_strings(fdt) + (uint64_t)fdt_size_dt_strings(fdt)) > ULONG_MAX)
+		return FDT_ERR_BADOFFSET;
+
+	if ((fdt_start + fdt_off_dt_strings(fdt) + fdt_size_dt_strings(fdt)) > fdt_end)
+		return FDT_ERR_BADOFFSET;
 
 	return 0;
 }

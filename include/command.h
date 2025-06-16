@@ -111,6 +111,11 @@ extern int common_diskboot(cmd_tbl_t *cmdtp, const char *intf, int argc,
 
 extern int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 
+#if defined(CONFIG_SMP_CMD_SUPPORT)
+extern int do_runmulticore(cmd_tbl_t *cmdtp,
+			   int flag, int argc, char *const argv[]);
+#endif
+
 /*
  * Error codes that commands return to cmd_process(). We use the standard 0
  * and 1 for success and failure, but add one more case - failure with a
@@ -122,6 +127,7 @@ extern int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]);
 enum command_ret_t {
 	CMD_RET_SUCCESS,	/* 0 = Success */
 	CMD_RET_FAILURE,	/* 1 = Failure */
+	CMD_RET_CRASH_DUMP,	/* 2 = Crash dump */
 	CMD_RET_USAGE = -1,	/* Failure, please report 'usage' error */
 };
 
@@ -151,6 +157,7 @@ void fixup_cmdtable(cmd_tbl_t *cmdtp, int size);
 #define CMD_FLAG_REPEAT		0x0001	/* repeat last command		*/
 #define CMD_FLAG_BOOTD		0x0002	/* command is from bootd	*/
 #define CMD_FLAG_ENV		0x0004	/* command is from the environment */
+#define CMD_FLAG_SEC_CORE	0x0008  /* command is from secondary core */
 
 #ifdef CONFIG_AUTO_COMPLETE
 # define _CMD_COMPLETE(x) x,

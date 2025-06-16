@@ -6,6 +6,7 @@
 
 #define BIT(nr)			(1UL << (nr))
 #define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
+#define BITS_MASK(_s, _n)	(((1UL << (_n)) - 1) << _s)
 #define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
 
 /*
@@ -121,6 +122,17 @@ static inline unsigned int generic_hweight8(unsigned int w)
 }
 
 #include <asm/bitops.h>
+
+#define for_each_clear_bit(bit, addr, size) \
+	for ((bit) = find_first_zero_bit((addr), (size));	\
+		(bit) < (size);					\
+		(bit) = find_next_zero_bit((addr), (size), (bit) + 1))
+
+/* same as for_each_clear_bit() but use bit as value to start with */
+#define for_each_clear_bit_from(bit, addr, size) \
+	for ((bit) = find_next_zero_bit((addr), (size), (bit));	\
+		(bit) < (size);					\
+		(bit) = find_next_zero_bit((addr), (size), (bit) + 1))
 
 /* linux/include/asm-generic/bitops/non-atomic.h */
 

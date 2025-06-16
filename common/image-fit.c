@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#define LOG_CATEGORY LOGC_BOOT
 #ifdef USE_HOSTCC
 #include "mkimage.h"
 #include <image.h>
@@ -264,7 +264,7 @@ static void fit_image_print_data(const void *fit, int noffset, const char *p,
 	uint8_t *value;
 	int value_len;
 	char *algo;
-	int required;
+	bool required;
 	int ret, i;
 
 	debug("%s  %s node:    '%s'\n", p, type,
@@ -275,8 +275,8 @@ static void fit_image_print_data(const void *fit, int noffset, const char *p,
 		return;
 	}
 	printf("%s", algo);
-	keyname = fdt_getprop(fit, noffset, "key-name-hint", NULL);
-	required = fdt_getprop(fit, noffset, "required", NULL) != NULL;
+	keyname = fdt_getprop(fit, noffset, FIT_KEY_HINT, NULL);
+	required = fdt_getprop(fit, noffset, FIT_KEY_REQUIRED, NULL) != NULL;
 	if (keyname)
 		printf(":%s", keyname);
 	if (required)
@@ -991,11 +991,22 @@ int fit_image_verify(const void *fit, int image_noffset)
 {
 	const void	*data;
 	size_t		size;
-	int		noffset = 0;
 	char		*err_msg = "";
 	int verify_all = 1;
 	int ret;
+	int noffset = 0;
 
+#if defined(CONFIG_FIT_SIGNATURE)
+	const char *name = fit_get_name(fit, image_noffset, NULL);
+	if (strchr(name, '@')) {
+		/*
+		 * We don't support this since libfdt considers names with the
+		 * name root but different @ suffix to be equal
+		 */
+		err_msg = "Node name contains @";
+		goto error;
+	}
+#endif
 	/* Get image data and data length */
 	if (fit_image_get_data(fit, image_noffset, &data, &size)) {
 		err_msg = "Can't get image data/size";
@@ -1193,6 +1204,33 @@ int fit_image_check_comp(const void *fit, int noffset, uint8_t comp)
 }
 
 /**
+ * fdt_check_no_at() - Check for nodes whose names contain '@'
+ * This checks the parent node and all subnodes recursively
+ * @fit: FIT to check
+ * @parent: Parent node to check
+ * @return 0 if OK, -EADDRNOTAVAIL is a node has a name containing '@'
+ */
+#if defined(CONFIG_FIT_SIGNATURE)
+static int fdt_check_no_at(const void *fit, int parent)
+{
+	const char *name;
+	int node;
+	int ret;
+
+	name = fdt_get_name(fit, parent, NULL);
+	if (!name || strchr(name, '@'))
+		return -EADDRNOTAVAIL;
+
+	fdt_for_each_subnode(fit, node, parent) {
+		ret = fdt_check_no_at(fit, node);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+#endif
+/**
  * fit_check_format - sanity check FIT image format
  * @fit: pointer to the FIT format image header
  *
@@ -1203,29 +1241,71 @@ int fit_image_check_comp(const void *fit, int noffset, uint8_t comp)
  *     1, on success
  *     0, on failure
  */
-int fit_check_format(const void *fit)
+int fit_check_format(const void *fit, ulong size)
 {
+	int ret;
+
+	ret = fdt_check_header(fit);
+	if (ret) {
+		debug("Wrong FIT format: not a flattened device tree\n");
+		return -ENOEXEC;
+	}
+
+#if defined(CONFIG_FIT_FULL_CHECK)
+		/*
+		 * If we are not given the size, make do wtih calculating it.
+		 * This is not as secure, so we should consider a flag to
+		 * control this.
+		 */
+		if (size == IMAGE_SIZE_INVAL)
+			size = fdt_totalsize(fit);
+		ret = fdt_check_full(fit, size);
+		if (ret)
+			ret = -EINVAL;
+
+		/*
+		 * U-Boot stopped using unit addressed in 2017. Since libfdt
+		 * can match nodes ignoring any unit address, signature
+		 * verification can see the wrong node if one is inserted with
+		 * the same name as a valid node but with a unit address
+		 * attached. Protect against this by disallowing unit addresses.
+		 */
+#if defined(CONFIG_FIT_SIGNATURE)
+		if (!ret)
+			ret = fdt_check_no_at(fit, 0);
+
+			if (ret) {
+				debug("FIT check error %d\n", ret);
+				return ret;
+			}
+		}
+#endif
+		if (ret) {
+			debug("FIT check error %d\n", ret);
+			return ret;
+		}
+#endif
 	/* mandatory / node 'description' property */
-	if (fdt_getprop(fit, 0, FIT_DESC_PROP, NULL) == NULL) {
+	if (!fdt_getprop(fit, 0, FIT_DESC_PROP, NULL)) {
 		debug("Wrong FIT format: no description\n");
-		return 0;
+		return -ENOMSG;
 	}
 
 	if (IMAGE_ENABLE_TIMESTAMP) {
 		/* mandatory / node 'timestamp' property */
-		if (fdt_getprop(fit, 0, FIT_TIMESTAMP_PROP, NULL) == NULL) {
+		if (!fdt_getprop(fit, 0, FIT_TIMESTAMP_PROP, NULL)) {
 			debug("Wrong FIT format: no timestamp\n");
-			return 0;
+			return -ENODATA;
 		}
 	}
 
 	/* mandatory subimages parent '/images' node */
 	if (fdt_path_offset(fit, FIT_IMAGES_PATH) < 0) {
 		debug("Wrong FIT format: no images parent node\n");
-		return 0;
+		return -ENOENT;
 	}
 
-	return 1;
+	return 0;
 }
 
 
@@ -1569,6 +1649,10 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 	uint8_t os;
 	const char *prop_name;
 	int ret;
+#if defined(CONFIG_DTB_COMPRESSION)
+	bootm_headers_t fdt = {0};
+#endif
+	uint8_t comp_type = IH_COMP_NONE;
 
 	fit = map_sysmem(addr, 0);
 	fit_uname = fit_unamep ? *fit_unamep : NULL;
@@ -1577,10 +1661,15 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 	printf("## Loading %s from FIT Image at %08lx ...\n", prop_name, addr);
 
 	bootstage_mark(bootstage_id + BOOTSTAGE_SUB_FORMAT);
-	if (!fit_check_format(fit)) {
-		printf("Bad FIT %s image format!\n", prop_name);
+	ret = fit_check_format(fit, IMAGE_SIZE_INVAL);
+	if (ret) {
+		printf("Bad FIT %s image format! (err=%d)\n", prop_name, ret);
+#if defined(CONFIG_FIT_SIGNATURE)
+		if (ret == -EADDRNOTAVAIL)
+			printf("Signature checking prevents use of unit addresses (@) in nodes\n");
+#endif
 		bootstage_error(bootstage_id + BOOTSTAGE_SUB_FORMAT);
-		return -ENOEXEC;
+		return ret;
 	}
 	bootstage_mark(bootstage_id + BOOTSTAGE_SUB_FORMAT_OK);
 	if (fit_uname) {
@@ -1612,7 +1701,8 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 			/* Remember (and possibly verify) this config */
 			images->fit_uname_cfg = fit_uname_config;
 			if (IMAGE_ENABLE_VERIFY && images->verify) {
-				puts("   Verifying Hash Integrity ... ");
+				printf("Verifying Hash Integrity for node '%s'... ",
+						fdt_get_name(fit, cfg_noffset, NULL));
 				if (fit_config_verify(fit, cfg_noffset)) {
 					puts("Bad Data Hash\n");
 					bootstage_error(bootstage_id +
@@ -1629,7 +1719,7 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 		fit_uname = fit_get_name(fit, noffset, NULL);
 	}
 	if (noffset < 0) {
-		puts("Could not find subimage node\n");
+		printf("Could not find subimage node type '%s'\n", prop_name);
 		bootstage_error(bootstage_id + BOOTSTAGE_SUB_SUBNODE);
 		return -ENOENT;
 	}
@@ -1650,11 +1740,13 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 		return -ENOEXEC;
 	}
 #endif
+#if !defined(CONFIG_DTB_COMPRESSION)
 	if (image_type == IH_TYPE_FLATDT &&
 	    !fit_image_check_comp(fit, noffset, IH_COMP_NONE)) {
 		puts("FDT image is compressed");
 		return -EPROTONOSUPPORT;
 	}
+#endif
 
 	bootstage_mark(bootstage_id + BOOTSTAGE_SUB_CHECK_ALL);
 	type_ok = fit_image_check_type(fit, noffset, image_type) ||
@@ -1691,10 +1783,30 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 	}
 	len = (ulong)size;
 
-	/* verify that image data is a proper FDT blob */
-	if (image_type == IH_TYPE_FLATDT && fdt_check_header(buf)) {
-		puts("Subimage data is not a FDT");
-		return -ENOEXEC;
+#if defined(CONFIG_DTB_COMPRESSION)
+	if (!fit_image_get_comp(fit, noffset, &comp_type)
+				&& (comp_type != IH_COMP_NONE)) {
+		printf("   %s %s image found\n",
+		       genimg_get_comp_name(comp_type), prop_name);
+		if (fit_image_get_load(fit, noffset,
+				       &load) != 0) {
+			printf("ERROR: load address not found for "
+			       "compressed %s..\n", prop_name);
+			return -EFAULT;
+		} else {
+			fdt.os.comp = comp_type;
+			fdt.os.type = IH_TYPE_FLATDT;
+			printf("   %s load address is: 0x%08x\n", prop_name,
+			       (unsigned int)load);
+		}
+	}
+#endif
+	if (comp_type == IH_COMP_NONE) {
+		/* verify that image data is a proper FDT blob */
+		if (image_type == IH_TYPE_FLATDT && fdt_check_header(buf)) {
+			puts("Subimage data is not a FDT");
+			return -ENOEXEC;
+		}
 	}
 
 	bootstage_mark(bootstage_id + BOOTSTAGE_SUB_GET_DATA_OK);
@@ -1722,7 +1834,6 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 	} else if (load_op != FIT_LOAD_OPTIONAL_NON_ZERO || load) {
 		ulong image_start, image_end;
 		ulong load_end;
-		void *dst;
 
 		/*
 		 * move image data to the load address,
@@ -1741,8 +1852,27 @@ int fit_image_load(bootm_headers_t *images, ulong addr,
 		printf("   Loading %s from 0x%08lx to 0x%08lx\n",
 		       prop_name, data, load);
 
-		dst = map_sysmem(load, len);
+#if defined(CONFIG_DTB_COMPRESSION)
+		if (comp_type != IH_COMP_NONE) {
+			fdt.os.image_start = (ulong)data;
+			fdt.os.image_len = len;
+			fdt.os.load = load;
+			if (!bootm_load_os(&fdt, &load_end, 1)) {
+				/*
+				 * verify that uncompressed image
+				 * data is a proper FDT blob
+				 * */
+				if (fdt_check_header((char *)load) != 0) {
+					printf("Error: Uncompresed FIT Subimage"
+					       " data is not a %s", prop_name);
+					return -ENOEXEC;
+				}
+			}
+		}
+#else
+		void *dst = map_sysmem(load, len);
 		memmove(dst, buf, len);
+#endif
 		data = load;
 	}
 	bootstage_mark(bootstage_id + BOOTSTAGE_SUB_LOAD);
