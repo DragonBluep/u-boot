@@ -17,7 +17,7 @@
 #include "net_rand.h"
 
 /* We don't need more than 32 bits of the counter */
-#define MONOTONIC_MS() ((unsigned)get_timer(0) * (1000 / CONFIG_SYS_HZ))
+#define MONOTONIC_MS() 1 //((unsigned)get_timer(0) * (1000 / CONFIG_SYS_HZ))
 
 enum {
 /* 169.254.0.0 */

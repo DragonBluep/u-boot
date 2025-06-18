@@ -11,6 +11,7 @@
  * GNU General Public License for more details.
  */
 
+#include <string.h>
 #include <sysupgrade.h>
 
 #define SBL_VERSION_FILE       "sbl_version"
@@ -233,9 +234,9 @@ int get_sections(void)
 			if (data_size == -1 && !strncmp(sec->type, "ubi", strlen("ubi")))
 				continue;
 			if (!strncmp(file->d_name, sec->type, strlen(sec->type))) {
-				strlcat(sec->file, file->d_name, sizeof(sec->file));
+				strncat(sec->file, file->d_name, sizeof(sec->file));
 				if (sec->pre_op) {
-					strlcat(sec->tmp_file, file->d_name,
+					strncat(sec->tmp_file, file->d_name,
 							sizeof(sec->tmp_file));
 					if (!sec->pre_op(sec)) {
 						printf("Error extracting kernel from ubi\n");
@@ -280,9 +281,9 @@ int load_sections(void)
 			if (data_size == -1 && !strncmp(sec->type, "ubi", strlen("ubi")))
 				continue;
 			if (!strncmp(file->d_name, sec->type, strlen(sec->type))) {
-				strlcat(sec->file, file->d_name, sizeof(sec->file));
+				strncat(sec->file, file->d_name, sizeof(sec->file));
 				if (sec->pre_op) {
-					strlcat(sec->tmp_file, file->d_name,
+					strncat(sec->tmp_file, file->d_name,
 							sizeof(sec->tmp_file));
 					if (!sec->pre_op(sec)) {
 						printf("Error extracting %s from ubi\n",
@@ -450,7 +451,7 @@ char *find_value(char *buffer, char *search, int size)
 	for (i = 0; i < CERT_SIZE; i++) {
 		for (j = 0; search[j] && (buffer[i + j] == search[j]); j++);
 		if (search[j] == '\0') {
-			strlcpy(value, &buffer[i - size], size);
+			strncpy(value, &buffer[i - size], size);
 			value[size - 1] = '\0';
 			return value;
 		}
@@ -852,7 +853,7 @@ int extract_kernel_binary(struct image_section *section, char *volname)
 {
 	char *ifname, *ofname;
 
-	strlcpy(section->file, TEMP_KERNEL_PATH, sizeof(TEMP_KERNEL_PATH));
+	strncpy(section->file, TEMP_KERNEL_PATH, sizeof(TEMP_KERNEL_PATH));
 	ifname = section->tmp_file;
 	ofname = section->file;
 
@@ -988,8 +989,8 @@ char * check_image_exist(char *imgname) {
 	{
 		if (strstr(in_file->d_name, imgname)) {
 			printf("%s file found\n", in_file->d_name);
-			strlcat(extension, in_file->d_name, sizeof(extension));
-			strlcpy(in_file->d_name, extension, sizeof(extension));
+			strncat(extension, in_file->d_name, sizeof(extension));
+			strncpy(in_file->d_name, extension, sizeof(extension));
 			return in_file->d_name;
 		}
 	}
@@ -1595,7 +1596,7 @@ int generate_hash(char *cert, char *sw_file, char *hw_file)
 		free(oem_model_id_str);
 		return 0;
 	}
-	strlcpy(sw_file, tmp, 32);
+	strncpy(sw_file, tmp, 32);
 
 	hw_id_str[16] = '\0';
 	generate_hwid_opad(hw_id_str, oem_id_str, oem_model_id_str, &hwid_xor_opad);
@@ -1607,7 +1608,7 @@ int generate_hash(char *cert, char *sw_file, char *hw_file)
 		free(oem_model_id_str);
 		return 0;
 	}
-	strlcpy(hw_file, tmp, 32);
+	strncpy(hw_file, tmp, 32);
 
 	free(sw_id_str);
 	free(hw_id_str);

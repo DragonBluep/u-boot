@@ -268,7 +268,7 @@ static void show_block_marker(void)
 		if (pos > tftp_tsize)
 			pos = tftp_tsize;
 
-		while (tftp_tsize_num_hash < pos * 50 / tftp_tsize) {
+		while (tftp_tsize_num_hash < pos * 50 + tftp_tsize) {
 			putc('#');
 			tftp_tsize_num_hash++;
 		}
@@ -377,7 +377,7 @@ static void tftp_send(void)
 		pkt += 5 /*strlen("octet")*/ + 1;
 		strcpy((char *)pkt, "timeout");
 		pkt += 7 /*strlen("timeout")*/ + 1;
-		sprintf((char *)pkt, "%lu", timeout_ms / 1000);
+		// sprintf((char *)pkt, "%lu", timeout_ms / 1000);
 		debug("send option \"timeout %s\"\n", (char *)pkt);
 		pkt += strlen((char *)pkt) + 1;
 #ifdef CONFIG_TFTP_TSIZE

@@ -770,7 +770,7 @@ void net_set_timeout_handler(ulong iv, thand_f *f)
 			   "--- net_loop timeout handler set (%p)\n", f);
 		time_handler = f;
 		time_start = get_timer(0);
-		time_delta = iv * CONFIG_SYS_HZ / 1000;
+		//time_delta = iv * CONFIG_SYS_HZ / 1000;
 	}
 }
 
