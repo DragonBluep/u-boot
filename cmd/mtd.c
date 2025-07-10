@@ -698,6 +698,7 @@ out_put_mtd:
 	return ret;
 }
 
+#if CONFIG_IS_ENABLED(MTD_RAW_NAND) || CONFIG_IS_ENABLED(MTD_SPI_NAND) || CONFIG_IS_ENABLED(MTK_SPI_NAND_MTD)
 static int do_mtd_bad(struct cmd_tbl *cmdtp, int flag, int argc,
 		      char *const argv[])
 {
@@ -727,6 +728,7 @@ out_put_mtd:
 
 	return CMD_RET_SUCCESS;
 }
+#endif
 
 #ifdef CONFIG_AUTO_COMPLETE
 static int mtd_name_complete(int argc, char *const argv[], char last_char,
@@ -774,7 +776,9 @@ U_BOOT_LONGHELP(mtd,
 	"mtd erase[.dontskipbad]               <name>        [<off> [<size>]]\n"
 	"\n"
 	"Specific functions:\n"
+#if CONFIG_IS_ENABLED(MTD_RAW_NAND) || CONFIG_IS_ENABLED(MTD_SPI_NAND) || CONFIG_IS_ENABLED(MTK_SPI_NAND_MTD)
 	"mtd bad                               <name>\n"
+#endif
 #if CONFIG_IS_ENABLED(CMD_MTD_OTP)
 	"mtd otpread                           <name> [u|f] <off> <size>\n"
 	"mtd otpwrite                          <name> <off> <hex string>\n"
@@ -813,6 +817,8 @@ U_BOOT_CMD_WITH_SUBCMDS(mtd, "MTD utils", mtd_help_text,
 		U_BOOT_SUBCMD_MKENT_COMPLETE(dump, 4, 0, do_mtd_io,
 					     mtd_name_complete),
 		U_BOOT_SUBCMD_MKENT_COMPLETE(erase, 4, 0, do_mtd_erase,
+#if CONFIG_IS_ENABLED(MTD_RAW_NAND) || CONFIG_IS_ENABLED(MTD_SPI_NAND) || CONFIG_IS_ENABLED(MTK_SPI_NAND_MTD)
 					     mtd_name_complete),
 		U_BOOT_SUBCMD_MKENT_COMPLETE(bad, 2, 1, do_mtd_bad,
+#endif
 					     mtd_name_complete));
