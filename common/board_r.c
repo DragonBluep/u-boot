@@ -66,6 +66,7 @@
 #include <wdt.h>
 #include <asm-generic/gpio.h>
 #include <relocate.h>
+#include <spi_flash.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -408,6 +409,20 @@ static int initr_onenand(void)
 }
 #endif
 
+#if defined(CONFIG_SPI_FLASH)
+/* probe SPI FLASH */
+static int initr_spiflash(void)
+{
+	struct udevice *new;
+
+	spi_flash_probe_bus_cs(CONFIG_SF_DEFAULT_BUS,
+			       CONFIG_SF_DEFAULT_CS,
+			       &new);
+
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_MMC
 static int initr_mmc(void)
 {
@@ -705,6 +720,9 @@ static void initcall_run_r(void)
 #endif
 #if CONFIG_IS_ENABLED(CMD_ONENAND)
 	INITCALL(initr_onenand);
+#endif
+#if CONFIG_IS_ENABLED(SPI_FLASH)
+	INITCALL(initr_spiflash);
 #endif
 #if CONFIG_IS_ENABLED(MMC)
 	INITCALL(initr_mmc);
