@@ -65,6 +65,7 @@
 #include <wdt.h>
 #include <asm-generic/gpio.h>
 #include <relocate.h>
+#include <mtd.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -407,6 +408,16 @@ static int initr_onenand(void)
 }
 #endif
 
+#if defined(CONFIG_MTD)
+/* probe MTD device */
+static int initr_mtd(void)
+{
+	mtd_probe_devices();
+
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_MMC
 static int initr_mmc(void)
 {
@@ -708,6 +719,9 @@ static void initcall_run_r(void)
 #endif
 #if CONFIG_IS_ENABLED(PVBLOCK)
 	INITCALL(initr_pvblock);
+#endif
+#if CONFIG_IS_ENABLED(MTD)
+	INITCALL(initr_mtd);
 #endif
 	INITCALL(initr_env);
 #if CONFIG_IS_ENABLED(SYS_MALLOC_BOOTPARAMS)
