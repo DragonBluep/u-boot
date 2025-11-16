@@ -229,6 +229,14 @@ struct spi_nor_fixups {
 
 #define SPI_NOR_SRST_SLEEP_LEN			200
 
+#if IS_ENABLED(CONFIG_ARCH_MTMIPS) || IS_ENABLED(CONFIG_ARCH_MEDIATEK)
+#define SPINOR_TRIM
+#endif
+#if IS_ENABLED(CONFIG_ARCH_MTMIPS)
+#undef SNOR_SR1_BIT6_QUAD_ENABLE
+#undef SNOR_SR2_BIT1_QUAD_ENABLE
+#endif
+
 /**
  * spi_nor_get_cmd_ext() - Get the command opcode extension based on the
  *			   extension type.
@@ -4183,7 +4191,7 @@ static struct spi_nor_fixups mt35xu512aba_fixups = {
 };
 #endif /* CONFIG_SPI_FLASH_MT35XU */
 
-#if CONFIG_IS_ENABLED(SPI_FLASH_MACRONIX)
+#if CONFIG_IS_ENABLED(SPI_FLASH_MACRONIX) && !defined(SPINOR_TRIM)
 /**
  * spi_nor_macronix_octal_dtr_enable() - Enable octal DTR on Macronix flashes.
  * @nor:	pointer to a 'struct spi_nor'
@@ -4471,7 +4479,7 @@ void spi_nor_set_fixups(struct spi_nor *nor)
 		nor->fixups = &mt35xu512aba_fixups;
 #endif
 
-#if CONFIG_IS_ENABLED(SPI_FLASH_MACRONIX)
+#if CONFIG_IS_ENABLED(SPI_FLASH_MACRONIX) && !defined(SPINOR_TRIM)
 	if (JEDEC_MFR(nor->info) == SNOR_MFR_MACRONIX &&
 	    nor->info->flags & SPI_NOR_OCTAL_DTR_READ)
 		nor->fixups = &macronix_octal_fixups;

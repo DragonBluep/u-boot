@@ -482,6 +482,7 @@ static int do_pstore(struct cmd_tbl *cmdtp, int flag, int argc, char * const arg
 	return c->cmd(cmdtp, flag, argc, argv);
 }
 
+#if !IS_ENABLED(CONFIG_ARCH_MTMIPS) && !IS_ENABLED(CONFIG_ARCH_MEDIATEK)
 void fdt_fixup_pstore(void *blob)
 {
 	char node[32];
@@ -553,6 +554,7 @@ void fdt_fixup_pstore(void *blob)
 clean_ramoops:
 	fdt_del_node_and_alias(blob, node);
 }
+#endif
 
 U_BOOT_CMD(pstore, 10, 0, do_pstore,
 	   "Manage Linux Persistent Storage",

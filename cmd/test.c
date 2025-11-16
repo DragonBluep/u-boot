@@ -144,9 +144,11 @@ static int do_test(struct cmd_tbl *cmdtp, int flag, int argc,
 			expr = simple_strtol(ap[0], NULL, 0) >=
 					simple_strtol(ap[2], NULL, 0);
 			break;
+#if !IS_ENABLED(CONFIG_ARCH_MTMIPS) || IS_ENABLED(CONFIG_CMD_UBIFS)
 		case OP_FILE_EXISTS:
 			expr = file_exists(ap[1], ap[2], ap[3], FS_TYPE_ANY);
 			break;
+#endif
 #ifdef CONFIG_REGEX
 		case OP_REGEX: {
 			struct slre slre;
