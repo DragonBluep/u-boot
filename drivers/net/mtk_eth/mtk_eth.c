@@ -371,7 +371,7 @@ static int mtk_switch_init(struct mtk_eth_priv *priv)
 		reset_wait_time = swdrv->reset_wait_time;
 
 	/* Global reset switch */
-	if (priv->mcm) {
+	if (priv->mcm || IS_ENABLED(CONFIG_SOC_MT7621)) {
 		reset_assert(&priv->rst_mcm);
 		udelay(1000);
 		reset_deassert(&priv->rst_mcm);
@@ -1261,7 +1261,7 @@ static int mtk_eth_probe(struct udevice *dev)
 		return ret;
 
 	/* Probe phy if switch is not specified */
-	if (!priv->swname)
+	if (!(priv->swname || IS_ENABLED(CONFIG_SOC_MT7621)))
 		return mtk_phy_probe(dev);
 
 	/* Initialize switch */
@@ -1440,9 +1440,9 @@ static int mtk_eth_of_to_plat(struct udevice *dev)
 	}
 
 	priv->swname = dev_read_string(dev, "mediatek,switch");
-	if (priv->swname) {
+	if (priv->swname || IS_ENABLED(CONFIG_SOC_MT7621)) {
 		priv->mcm = dev_read_bool(dev, "mediatek,mcm");
-		if (priv->mcm) {
+		if (priv->mcm || IS_ENABLED(CONFIG_SOC_MT7621)) {
 			ret = reset_get_by_name(dev, "mcm", &priv->rst_mcm);
 			if (ret) {
 				printf("error: no reset ctrl for mcm\n");
@@ -1472,6 +1472,7 @@ static int mtk_eth_of_to_plat(struct udevice *dev)
 	return 0;
 }
 
+#if !IS_ENABLED(CONFIG_SOC_MT7621)
 static const struct mtk_soc_data mt7988_data = {
 	.caps = MT7988_CAPS,
 	.ana_rgc3 = 0x128,
@@ -1533,6 +1534,7 @@ static const struct mtk_soc_data mt7622_data = {
 	.txd_size = sizeof(struct mtk_tx_dma),
 	.rxd_size = sizeof(struct mtk_rx_dma),
 };
+#endif
 
 static const struct mtk_soc_data mt7621_data = {
 	.caps = MT7621_CAPS,
@@ -1543,6 +1545,7 @@ static const struct mtk_soc_data mt7621_data = {
 };
 
 static const struct udevice_id mtk_eth_ids[] = {
+#if !IS_ENABLED(CONFIG_SOC_MT7621)
 	{ .compatible = "mediatek,mt7988-eth", .data = (ulong)&mt7988_data },
 	{ .compatible = "mediatek,mt7987-eth", .data = (ulong)&mt7987_data },
 	{ .compatible = "mediatek,mt7986-eth", .data = (ulong)&mt7986_data },
@@ -1550,6 +1553,7 @@ static const struct udevice_id mtk_eth_ids[] = {
 	{ .compatible = "mediatek,mt7629-eth", .data = (ulong)&mt7629_data },
 	{ .compatible = "mediatek,mt7623-eth", .data = (ulong)&mt7623_data },
 	{ .compatible = "mediatek,mt7622-eth", .data = (ulong)&mt7622_data },
+#endif
 	{ .compatible = "mediatek,mt7621-eth", .data = (ulong)&mt7621_data },
 	{}
 };

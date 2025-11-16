@@ -51,7 +51,9 @@ const struct {
 	{0, "-a", OP_AND, 1},
 	{0, "-z", OP_STR_EMPTY, 2},
 	{0, "-n", OP_STR_NEMPTY, 2},
+#ifdef CONFIG_CMD_FS_GENERIC
 	{0, "-e", OP_FILE_EXISTS, 4},
+#endif
 #ifdef CONFIG_REGEX
 	{1, "=~", OP_REGEX, 3},
 #endif
@@ -172,9 +174,11 @@ static int do_test(struct cmd_tbl *cmdtp, int flag, int argc,
 			expr = simple_strtol(ap[0], NULL, 0) >=
 					simple_strtol(ap[2], NULL, 0);
 			break;
+#ifdef CONFIG_CMD_FS_GENERIC
 		case OP_FILE_EXISTS:
 			expr = file_exists(ap[1], ap[2], ap[3], FS_TYPE_ANY);
 			break;
+#endif
 #ifdef CONFIG_REGEX
 		case OP_REGEX: {
 			struct slre slre;
