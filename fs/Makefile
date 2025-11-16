@@ -11,7 +11,13 @@ obj-$(CONFIG_SPL_FS_EXT4) += ext4/
 obj-$(CONFIG_SPL_FS_CBFS) += cbfs/
 obj-$(CONFIG_SPL_FS_SQUASHFS) += squashfs/
 else
+ifdef CONFIG_ARCH_MTMIPS
+ifdef CONFIG_CMD_UBIFS
 obj-y				+= fs.o
+endif
+else
+obj-y				+= fs.o
+endif
 
 obj-$(CONFIG_FS_BTRFS) += btrfs/
 obj-$(CONFIG_FS_CBFS) += cbfs/
@@ -27,4 +33,10 @@ obj-$(CONFIG_CMD_ZFS) += zfs/
 obj-$(CONFIG_FS_SQUASHFS) += squashfs/
 obj-$(CONFIG_FS_EROFS) += erofs/
 endif
+ifdef CONFIG_ARCH_MTMIPS
+ifdef CONFIG_CMD_UBIFS
 obj-y += fs_internal.o
+endif
+else
+obj-y += fs_internal.o
+endif
