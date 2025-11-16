@@ -36,6 +36,10 @@
 #include <linux/lzo.h>
 #include <linux/ioport.h>
 
+#if IS_ENABLED(CONFIG_ARCH_MTMIPS) || IS_ENABLED(CONFIG_ARCH_MEDIATEK)
+#define FDTDEC_TRIM
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
 /*
@@ -48,6 +52,7 @@ DECLARE_GLOBAL_DATA_PTR;
  * good reason why driver-model conversion is infeasible. Examples include
  * things which are used before driver model is available.
  */
+#ifndef FDTDEC_TRIM
 #define COMPAT(id, name) name
 static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(UNKNOWN, "<none>"),
@@ -83,6 +88,7 @@ static const char * const compat_names[COMPAT_COUNT] = {
 	COMPAT(ALTERA_SOCFPGA_NOC, "altr,socfpga-a10-noc"),
 	COMPAT(ALTERA_SOCFPGA_CLK_INIT, "altr,socfpga-a10-clk-init")
 };
+#endif
 
 static const char *const fdt_src_name[] = {
 	[FDTSRC_SEPARATE] = "separate",
@@ -115,12 +121,14 @@ const char *fdtdec_get_srcname(void)
 	return fdt_src_name[gd->fdt_src];
 }
 
+#ifndef FDTDEC_TRIM
 const char *fdtdec_get_compatible(enum fdt_compat_id id)
 {
 	/* We allow reading of the 'unknown' ID for testing purposes */
 	assert(id >= 0 && id < COMPAT_COUNT);
 	return compat_names[id];
 }
+#endif
 
 fdt_addr_t fdtdec_get_addr_size_fixed(const void *blob, int node,
 				      const char *prop_name, int index, int na,
@@ -328,6 +336,7 @@ int fdtdec_get_is_enabled(const void *blob, int node)
 	return 1;
 }
 
+#ifndef FDTDEC_TRIM
 enum fdt_compat_id fdtdec_lookup(const void *blob, int node)
 {
 	enum fdt_compat_id id;
@@ -506,6 +515,7 @@ int fdtdec_add_aliases_for_id(const void *blob, const char *name,
 
 	return num_found;
 }
+#endif
 
 int fdtdec_get_alias_seq(const void *blob, const char *base, int offset,
 			 int *seqp)

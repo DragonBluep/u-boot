@@ -635,7 +635,9 @@ int image_setup_libfdt(struct bootm_headers *images, void *blob, bool lmb)
 	fdt_fixup_ethernet(blob);
 #if IS_ENABLED(CONFIG_CMD_PSTORE)
 	/* Append PStore configuration */
-	fdt_fixup_pstore(blob);
+	if (!IS_ENABLED(CONFIG_ARCH_MTMIPS) &&
+	    !IS_ENABLED(CONFIG_ARCH_MEDIATEK))
+		fdt_fixup_pstore(blob);
 #endif
 	if (IS_ENABLED(CONFIG_OF_BOARD_SETUP)) {
 		skip_board_fixup = (env_get_ulong("skip_board_fixup", 10, 0) == 1);
