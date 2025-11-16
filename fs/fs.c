@@ -34,6 +34,7 @@
 #include <erofs.h>
 #include <exfat.h>
 
+#if !CONFIG_IS_ENABLED(ARCH_MTMIPS) || CONFIG_IS_ENABLED(CMD_UBIFS)
 DECLARE_GLOBAL_DATA_PTR;
 
 static struct blk_desc *fs_dev_desc;
@@ -1172,3 +1173,7 @@ int fs_load_alloc(const char *ifname, const char *dev_part_str,
 
 	return 0;
 }
+#else
+int file_exists(const char *dev_type, const char *dev_part,
+		const char *file, int fstype) { return 0; }
+#endif

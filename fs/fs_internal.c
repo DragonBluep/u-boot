@@ -13,6 +13,7 @@
 #include <part.h>
 #include <memalign.h>
 
+#if !CONFIG_IS_ENABLED(ARCH_MTMIPS) || CONFIG_IS_ENABLED(CMD_UBIFS)
 int fs_devread(struct blk_desc *blk, struct disk_partition *partition,
 	       lbaint_t sector, int byte_offset, int byte_len, char *buf)
 {
@@ -194,3 +195,4 @@ int fs_devwrite(struct blk_desc *blk, struct disk_partition *partition,
 	}
 	return 1;
 }
+#endif
