@@ -156,6 +156,11 @@ config SPI_FLASH_ATMEL
 	help
 	  Add support for various Atmel SPI flash chips (AT45xxx and AT25xxx)
 
+config SPI_FLASH_BOYAMICRO
+	bool "BoyaMicro SPI flash support"
+	help
+	  Add support for various BoyaMicro SPI flash chips (BY25xxx)
+
 config SPI_FLASH_EON
 	bool "EON SPI flash support"
 	help
