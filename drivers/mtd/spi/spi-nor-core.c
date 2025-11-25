@@ -193,7 +193,8 @@ struct sfdp_header {
 #define SNOR_SR1_BIT6_QUAD_ENABLE
 #endif
 
-#if IS_ENABLED(CONFIG_SPI_FLASH_SPANSION) || \
+#if IS_ENABLED(CONFIG_SPI_FLASH_BOYAMICRO) || \
+    IS_ENABLED(CONFIG_SPI_FLASH_SPANSION) || \
     IS_ENABLED(CONFIG_SPI_FLASH_WINBOND)
 #define SNOR_SR2_BIT1_QUAD_ENABLE
 #endif
@@ -765,6 +766,7 @@ static int set_4byte(struct spi_nor *nor, const struct flash_info *info,
 		/* Some Micron need WREN command; all will accept it */
 		need_wren = true;
 		fallthrough;
+	case SNOR_MFR_BOYAMICRO:
 	case SNOR_MFR_ISSI:
 	case SNOR_MFR_MACRONIX:
 	case SNOR_MFR_WINBOND:

@@ -23,6 +23,7 @@
  * Sometimes these are the same as CFI IDs, but sometimes they aren't.
  */
 #define SNOR_MFR_ATMEL		CFI_MFR_ATMEL
+#define SNOR_MFR_BOYAMICRO	0x68
 #define SNOR_MFR_GIGADEVICE	0xc8
 #define SNOR_MFR_INTEL		CFI_MFR_INTEL
 #define SNOR_MFR_ST		CFI_MFR_ST /* ST Micro <--> Micron */
