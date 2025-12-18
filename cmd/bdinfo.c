@@ -19,6 +19,7 @@
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <display_options.h>
+#include <linux/libfdt.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -140,6 +141,13 @@ static void print_serial(struct udevice *dev)
 
 static int bdinfo_print_all(struct bd_info *bd)
 {
+	if (IS_ENABLED(CONFIG_OF_CONTROL)) {
+		const char *model;
+
+		model = fdt_getprop(gd->fdt_blob, 0, "model", NULL);
+		if (model)
+			printf("model       = %s\n", model);
+	}
 #ifdef DEBUG
 	bdinfo_print_num_l("bd address", (ulong)bd);
 #endif
