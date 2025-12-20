@@ -471,7 +471,7 @@ enum bootmenu_key bootmenu_autoboot_loop(struct bootmenu_data *menu,
 
 		if (ansi)
 			printf(ANSI_CURSOR_POSITION, menu->count + 5, 3);
-		printf("Hit any key to stop autoboot: %d ", menu->delay);
+		printf("\033[1mHit any key to stop autoboot:\033[33m %d \033[0m", menu->delay);
 		for (i = 0; i < 100; ++i) {
 			if (!tstc()) {
 				schedule();
