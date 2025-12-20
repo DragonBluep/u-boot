@@ -9,7 +9,7 @@
 
 static int do_pause(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
-	char *message = "Press any key to continue...";
+	char *message = "[1mPress any key to continue...[0m";
 
 	if (argc == 2)
 		message = argv[1];

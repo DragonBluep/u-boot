@@ -423,9 +423,9 @@ static struct bootmenu_data *bootmenu_create(int uefi, int delay)
 
 		/* Add Quit entry if exiting bootmenu is disabled */
 		if (!IS_ENABLED(CONFIG_BOOTMENU_DISABLE_UBOOT_CONSOLE))
-			entry->title = strdup("0. Exit");
+			entry->title = strdup("0. [1mExit[0m");
 		else
-			entry->title = strdup("0. Quit");
+			entry->title = strdup("0. [1mQuit[0m");
 
 		if (!entry->title) {
 			free(entry);
@@ -482,7 +482,7 @@ static void menu_display_statusline(struct menu *m)
 	printf(ANSI_CURSOR_POSITION, 1, 1);
 	puts(ANSI_CLEAR_LINE);
 	printf(ANSI_CURSOR_POSITION, 2, 3);
-	puts("*** U-Boot Boot Menu ***");
+	puts("[1m   *** U-Boot Boot Menu ***[0m");
 	puts(ANSI_CLEAR_LINE_TO_END);
 	printf(ANSI_CURSOR_POSITION, 3, 1);
 	puts(ANSI_CLEAR_LINE);
@@ -491,7 +491,7 @@ static void menu_display_statusline(struct menu *m)
 	printf(ANSI_CURSOR_POSITION, menu->count + 5, 1);
 	puts(ANSI_CLEAR_LINE);
 	printf(ANSI_CURSOR_POSITION, menu->count + 6, 3);
-	puts("Press UP/DOWN to move, ENTER to select, ESC to quit");
+	puts("[1mPress UP/DOWN to move, ENTER to select, ESC to quit[0m");
 	puts(ANSI_CLEAR_LINE_TO_END);
 	printf(ANSI_CURSOR_POSITION, menu->count + 7, 1);
 	puts(ANSI_CLEAR_LINE);
