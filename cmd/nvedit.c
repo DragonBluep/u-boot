@@ -36,6 +36,7 @@
 #include <mapmem.h>
 #include <asm/global_data.h>
 #include <linux/bitops.h>
+#include <linux/ctype.h>
 #include <linux/printk.h>
 #include <u-boot/crc.h>
 #include <linux/stddef.h>
@@ -316,6 +317,22 @@ int do_env_readmem(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]
 
 	if (hexdump) {
 		sprintf(varstr, "%pM", buf);
+	} else if (!strncmp(local_args[1], "ethaddr", 8)) {
+		char *hexstr = (char *)buf;
+		int bs = (bytes == 12 ? 2 : (bytes == 17 ? 3 : 0));
+
+		if (!bs)
+			goto exit;
+
+		for (int i = 0; i < 6; i++) {
+			if (!isxdigit(hexstr[bs * i]) || !isxdigit(hexstr[bs * i + 1]))
+				goto exit;
+
+			varstr[i * 3] = tolower(hexstr[bs * i]);
+			varstr[i * 3 + 1] = tolower(hexstr[bs * i + 1]);
+			varstr[i * 3 + 2] = ':';
+		}
+		varstr[17] = '\0';
 	} else {
 		memcpy(varstr, buf, bytes);
 		varstr[bytes] = '\0';
@@ -324,6 +341,11 @@ int do_env_readmem(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]
 
 	/* Continue calling setenv code */
 	return env_do_env_set(flag, 3, local_args, H_INTERACTIVE);
+
+exit:
+	puts("Wrong MAC address format!\n");
+	unmap_sysmem(buf);
+	return 1;
 }
 #endif
 
