@@ -717,6 +717,12 @@ config CMD_ENV_EXISTS
 	  Check if a variable is defined in the environment for use in
 	  shell scripting.
 
+config CMD_ENV_READMEM
+	bool "env readmem"
+	default y
+	help
+	  Store memory content into environment variable.
+
 config CMD_ENV_CALLBACK
 	bool "env callbacks - print callbacks and their associated variables"
 	help
