@@ -1792,16 +1792,15 @@ static int run_list_real(struct pipe *pi)
 		}
 	}
 	for (; pi; pi = (flag_restore != 0) ? rpipe : pi->next) {
-		if (pi->r_mode == RES_WHILE || pi->r_mode == RES_UNTIL ||
-			pi->r_mode == RES_FOR) {
 #ifdef __U_BOOT__
-				/* check Ctrl-C */
-				ctrlc();
-				if ((had_ctrlc())) {
-					return 1;
-				}
+		/* check Ctrl-C */
+		ctrlc();
+		if (had_ctrlc())
+			return 1;
 #endif
-				flag_restore = 0;
+		if (pi->r_mode == RES_WHILE || pi->r_mode == RES_UNTIL ||
+		    pi->r_mode == RES_FOR) {
+			flag_restore = 0;
 				if (!rpipe) {
 					flag_rep = 0;
 					rpipe = pi;
@@ -3207,6 +3206,11 @@ static int parse_stream_outer(struct in_str *inp, int flag)
 			run_list(ctx.list_head);
 #else
 			code = run_list(ctx.list_head);
+			/* clear Ctrl-C status when one pipe reaches the end */
+			if (had_ctrlc() && !(flag & FLAG_REPARSING)) {
+				puts("^C\n");
+				clear_ctrlc();
+			}
 			if (code == -2) {	/* exit */
 				b_free(&temp);
 				code = 0;
