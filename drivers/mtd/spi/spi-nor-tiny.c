@@ -36,6 +36,15 @@
 
 #define DEFAULT_READY_WAIT_JIFFIES		(40UL * HZ)
 
+#if IS_ENABLED(CONFIG_SPI_FLASH_MACRONIX)
+#define SNOR_SR1_BIT6_QUAD_ENABLE
+#endif
+
+#if IS_ENABLED(CONFIG_SPI_FLASH_SPANSION) || \
+    IS_ENABLED(CONFIG_SPI_FLASH_WINBOND)
+#define SNOR_SR2_BIT1_QUAD_ENABLE
+#endif
+
 static int spi_nor_read_write_reg(struct spi_nor *nor, struct spi_mem_op
 		*op, void *buf)
 {
@@ -120,7 +129,7 @@ static ssize_t spi_nor_read_data(struct spi_nor *nor, loff_t from, size_t len,
 	return len;
 }
 
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 /*
  * Read configuration register, returning its value in the
  * location. Return the configuration register value.
@@ -253,9 +262,7 @@ static inline int set_4byte(struct spi_nor *nor, const struct flash_info *info,
 	}
 }
 
-#if defined(CONFIG_SPI_FLASH_SPANSION) ||	\
-	defined(CONFIG_SPI_FLASH_WINBOND) ||	\
-	defined(CONFIG_SPI_FLASH_MACRONIX)
+#if defined(SNOR_SR1_BIT6_QUAD_ENABLE) || defined(SNOR_SR2_BIT1_QUAD_ENABLE)
 /*
  * Read the status register, returning its value in the location
  * Return the status register value.
@@ -356,7 +363,7 @@ static int spi_nor_wait_till_ready(struct spi_nor *nor)
 	return spi_nor_wait_till_ready_with_timeout(nor,
 						    DEFAULT_READY_WAIT_JIFFIES);
 }
-#endif /* CONFIG_SPI_FLASH_SPANSION */
+#endif
 
 /*
  * Erase an address range on the nor chip.  The address range may extend
@@ -433,7 +440,7 @@ static int spi_nor_write_tiny(struct mtd_info *mtd, loff_t to, size_t len,
 	return -ENOTSUPP;
 }
 
-#ifdef CONFIG_SPI_FLASH_MACRONIX
+#ifdef SNOR_SR1_BIT6_QUAD_ENABLE
 /**
  * macronix_quad_enable() - set QE bit in Status Register.
  * @nor:	pointer to a 'struct spi_nor'
@@ -472,7 +479,7 @@ static int macronix_quad_enable(struct spi_nor *nor)
 }
 #endif
 
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 /*
  * Write status Register and configuration register with 2 bytes
  * The first byte will be written to the status register, while the
@@ -554,7 +561,7 @@ static int spansion_read_cr_quad_enable(struct spi_nor *nor)
 
 	return 0;
 }
-#endif /* CONFIG_SPI_FLASH_SPANSION */
+#endif /* SNOR_SR2_BIT1_QUAD_ENABLE */
 
 static void
 spi_nor_set_read_settings(struct spi_nor_read_command *read,
@@ -662,7 +669,7 @@ static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
 	/* Enable Quad I/O if needed. */
 	if (spi_nor_get_protocol_width(nor->read_proto) == 4) {
 		switch (JEDEC_MFR(info)) {
-#ifdef CONFIG_SPI_FLASH_MACRONIX
+#ifdef SNOR_SR1_BIT6_QUAD_ENABLE
 		case SNOR_MFR_MACRONIX:
 			err = macronix_quad_enable(nor);
 			break;
@@ -672,7 +679,7 @@ static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
 			break;
 
 		default:
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 			/* Kept only for backward compatibility purpose. */
 			err = spansion_read_cr_quad_enable(nor);
 #endif
