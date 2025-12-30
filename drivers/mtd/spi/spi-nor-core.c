@@ -188,6 +188,16 @@ struct sfdp_header {
 /* Status, Control and Configuration Register Map(SCCR) */
 #define SCCR_DWORD22_OCTAL_DTR_EN_VOLATILE      BIT(31)
 
+#if IS_ENABLED(CONFIG_SPI_FLASH_ISSI) || \
+    IS_ENABLED(CONFIG_SPI_FLASH_MACRONIX)
+#define SNOR_SR1_BIT6_QUAD_ENABLE
+#endif
+
+#if IS_ENABLED(CONFIG_SPI_FLASH_SPANSION) || \
+    IS_ENABLED(CONFIG_SPI_FLASH_WINBOND)
+#define SNOR_SR2_BIT1_QUAD_ENABLE
+#endif
+
 struct sfdp_bfpt {
 	u32	dwords[BFPT_DWORD_MAX];
 };
@@ -578,7 +588,7 @@ static int read_fsr(struct spi_nor *nor)
  * location. Return the configuration register value.
  * Returns negative if error occurred.
  */
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 static int read_cr(struct spi_nor *nor)
 {
 	int ret;
@@ -2110,7 +2120,7 @@ write_err:
 	return ret;
 }
 
-#if defined(CONFIG_SPI_FLASH_MACRONIX) || defined(CONFIG_SPI_FLASH_ISSI)
+#ifdef SNOR_SR1_BIT6_QUAD_ENABLE
 /**
  * macronix_quad_enable() - set QE bit in Status Register.
  * @nor:	pointer to a 'struct spi_nor'
@@ -2204,7 +2214,7 @@ static int spansion_quad_enable_volatile(struct spi_nor *nor, u32 addr_base,
 }
 #endif
 
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 /*
  * Write status Register and configuration register with 2 bytes
  * The first byte will be written to the status register, while the
@@ -2319,7 +2329,7 @@ static int spansion_no_read_cr_quad_enable(struct spi_nor *nor)
 }
 
 #endif /* CONFIG_SPI_FLASH_SFDP_SUPPORT */
-#endif /* CONFIG_SPI_FLASH_SPANSION */
+#endif /* SNOR_SR2_BIT1_QUAD_ENABLE */
 
 static void
 spi_nor_set_read_settings(struct spi_nor_read_command *read,
@@ -2710,18 +2720,18 @@ static int spi_nor_parse_bfpt(struct spi_nor *nor,
 	case BFPT_DWORD15_QER_NONE:
 		params->quad_enable = NULL;
 		break;
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 	case BFPT_DWORD15_QER_SR2_BIT1_BUGGY:
 	case BFPT_DWORD15_QER_SR2_BIT1_NO_RD:
 		params->quad_enable = spansion_no_read_cr_quad_enable;
 		break;
 #endif
-#if defined(CONFIG_SPI_FLASH_MACRONIX) || defined(CONFIG_SPI_FLASH_ISSI)
+#ifdef SNOR_SR1_BIT6_QUAD_ENABLE
 	case BFPT_DWORD15_QER_SR1_BIT6:
 		params->quad_enable = macronix_quad_enable;
 		break;
 #endif
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 	case BFPT_DWORD15_QER_SR2_BIT1:
 		params->quad_enable = spansion_read_cr_quad_enable;
 		break;
@@ -3155,7 +3165,7 @@ static int spi_nor_init_params(struct spi_nor *nor,
 	if (params->hwcaps.mask & (SNOR_HWCAPS_READ_QUAD |
 				   SNOR_HWCAPS_PP_QUAD)) {
 		switch (JEDEC_MFR(info)) {
-#if defined(CONFIG_SPI_FLASH_MACRONIX) || defined(CONFIG_SPI_FLASH_ISSI)
+#ifdef SNOR_SR1_BIT6_QUAD_ENABLE
 		case SNOR_MFR_MACRONIX:
 		case SNOR_MFR_ISSI:
 			params->quad_enable = macronix_quad_enable;
@@ -3166,7 +3176,7 @@ static int spi_nor_init_params(struct spi_nor *nor,
 			break;
 
 		default:
-#if defined(CONFIG_SPI_FLASH_SPANSION) || defined(CONFIG_SPI_FLASH_WINBOND)
+#ifdef SNOR_SR2_BIT1_QUAD_ENABLE
 			/* Kept only for backward compatibility purpose. */
 			params->quad_enable = spansion_read_cr_quad_enable;
 #endif
