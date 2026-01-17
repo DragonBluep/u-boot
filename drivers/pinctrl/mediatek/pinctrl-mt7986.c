@@ -756,6 +756,7 @@ static const struct mtk_pinctrl_soc mt7986_data = {
 	.base_names = mt7986_pinctrl_register_base_names,
 	.nbase_names = ARRAY_SIZE(mt7986_pinctrl_register_base_names),
 	.base_calc = 1,
+	.rev = MTK_PINCTRL_V1,
 };
 
 static int mtk_pinctrl_mt7986_probe(struct udevice *dev)
